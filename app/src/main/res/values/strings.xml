@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CodeFlow</string>
+    <string name="bluetooth">蓝牙</string>
+    <string name="wifi">WiFi / 局域网</string>
+    <string name="refresh">刷新</string>
+    <string name="no_devices">未发现设备\n请确保双方已开启蓝牙或处于同一WiFi网络</string>
+    <string name="ip_port_hint">IP地址:端口 (如 192.168.1.100:53318)</string>
+    <string name="connect">连接</string>
+    <string name="transfer_title">传输</string>
+    <string name="disconnect">断开</string>
+    <string name="attach_file">添加文件</string>
+    <string name="type_message">输入消息...</string>
+    <string name="send">发送</string>
+    <string name="device_icon">设备图标</string>
+    <string name="connection_request">连接请求</string>
+    <string name="connection_request_msg">%1$s 请求与你建立连接</string>
+    <string name="accept">接受</string>
+    <string name="reject">拒绝</string>
+    <string name="connected_to">已连接到 %1$s</string>
+    <string name="select_file">选择文件</string>
+    <string name="select_image">选择图片</string>
+    <string name="file_sending">发送中...</string>
+    <string name="file_sent">已发送</string>
+    <string name="file_received">已接收</string>
+    <string name="connection_type_bluetooth">蓝牙</string>
+    <string name="connection_type_wifi">WiFi</string>
+    <string name="waiting_connection">等待设备连接中...</string>
+    <string name="connecting">正在连接...</string>
+    <string name="permission_required">需要蓝牙和位置权限才能发现设备</string>
+    <string name="enable_bluetooth">请先开启蓝牙</string>
+    <string name="device_info_bt">蓝牙设备</string>
+    <string name="device_info_wifi">WiFi设备</string>
+    <string name="kb">KB</string>
+    <string name="mb">MB</string>
+    <string name="gb">GB</string>
+</resources>
