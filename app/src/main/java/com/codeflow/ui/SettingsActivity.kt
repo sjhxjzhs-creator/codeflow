@@ -28,6 +28,7 @@ class SettingsActivity : AppCompatActivity() {
         setupDiscoverableButton()
         updateVersion()
         setupContactAuthor()
+        setupGithubLink()
     }
 
     private fun setupToolbar() {
@@ -76,6 +77,17 @@ class SettingsActivity : AppCompatActivity() {
         binding.cardContact.setOnClickListener {
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://b23.tv/6Ih36mU"))
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupGithubLink() {
+        binding.cardGithub.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sjhxjzhs-creator/codeflow"))
                 startActivity(intent)
             } catch (_: Exception) {
                 Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
