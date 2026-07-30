@@ -29,6 +29,7 @@ class SettingsActivity : AppCompatActivity() {
         updateVersion()
         setupContactAuthor()
         setupGithubLink()
+        setupDownloadLink()
     }
 
     private fun setupToolbar() {
@@ -88,6 +89,17 @@ class SettingsActivity : AppCompatActivity() {
         binding.cardGithub.setOnClickListener {
             try {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sjhxjzhs-creator/codeflow"))
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupDownloadLink() {
+        binding.cardDownload.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sjhxjzhs-creator/codeflow/releases/latest"))
                 startActivity(intent)
             } catch (_: Exception) {
                 Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
