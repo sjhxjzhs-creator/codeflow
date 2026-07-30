@@ -121,7 +121,7 @@ class ConnectionManager(context: Context) {
             type = MessageType.TEXT,
             content = text,
             isFromMe = true,
-            status = MessageStatus.SENDING
+            status = MessageStatus.SENT
         )
         onMessageReceived?.invoke(message)
 
@@ -131,8 +131,6 @@ class ConnectionManager(context: Context) {
             timestamp = message.timestamp
         )
         sendPacket(TransferProtocol.PacketType.TEXT_MESSAGE, textMsg)
-
-        onMessageReceived?.invoke(message.copy(status = MessageStatus.SENT))
     }
 
     fun sendLargeFile(fileInfo: TransferProtocol.FileInfo, fileInputStream: InputStream, fileSize: Long) {

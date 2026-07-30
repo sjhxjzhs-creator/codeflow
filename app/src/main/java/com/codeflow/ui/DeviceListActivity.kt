@@ -81,8 +81,8 @@ class DeviceListActivity : AppCompatActivity() {
         binding.toolbar.inflateMenu(R.menu.toolbar_menu)
         binding.toolbar.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.action_become_server -> {
-                    startServerMode()
+                R.id.action_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
                     true
                 }
                 else -> false
@@ -108,13 +108,6 @@ class DeviceListActivity : AppCompatActivity() {
         binding.btnRefresh.setOnClickListener {
             isConnecting = false
             refreshDevices()
-        }
-
-        binding.btnConnect.setOnClickListener { manualConnect() }
-
-        binding.etIpAddress.setOnEditorActionListener { _, _, _ ->
-            manualConnect()
-            true
         }
     }
 
@@ -214,8 +207,6 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun refreshDevices() {
-        binding.tvLocalInfo.visibility = View.GONE
-
         if (isBluetoothMode) {
             val bt = connectionManager.getBluetoothDiscovery()
             if (!bt.isAvailable()) {
@@ -227,69 +218,23 @@ class DeviceListActivity : AppCompatActivity() {
                 enableBluetoothLauncher.launch(intent)
                 return
             }
-            val name = connectionManager.getDeviceName()
-            binding.tvLocalInfo.text = "本机: $name (蓝牙)"
-            binding.tvLocalInfo.visibility = View.VISIBLE
             connectionManager.stopNetworkDiscovery()
             connectionManager.startBluetoothDiscovery()
-            // 自动启动蓝牙服务器
             connectionManager.startBluetoothServer()
         } else {
             connectionManager.stopBluetoothDiscovery()
             connectionManager.startNetworkDiscovery()
-            // 自动启动网络服务器
             connectionManager.startNetworkServer()
-
-            val ip = connectionManager.getNetworkDiscovery().getLocalIpAddress()
-            val port = CodeFlowApp.TRANSFER_PORT
-            if (ip != null) {
-                binding.tvLocalInfo.text = "本机IP: $ip:$port"
-            } else {
-                binding.tvLocalInfo.text = "本机端口: $port (IP获取中...)"
-            }
-            binding.tvLocalInfo.visibility = View.VISIBLE
         }
         binding.progressBar.visibility = View.VISIBLE
     }
 
-    private fun startServerMode() {
-        if (isBluetoothMode) {
-            connectionManager.startBluetoothServer()
-            Toast.makeText(this, R.string.waiting_connection, Toast.LENGTH_LONG).show()
-        } else {
-            connectionManager.startNetworkServer()
-            Toast.makeText(this, R.string.waiting_connection, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    // 主动连接对方（不弹窗，请求由对方处理）
     private fun initiateConnection(device: Device) {
         binding.progressBar.visibility = View.VISIBLE
         when (device.connectionType) {
-            ConnectionType.BLUETOOTH -> connectionManager.connectViaBluetooth(device)
-            ConnectionType.WIFI -> connectionManager.connectViaNetwork(device)
+            com.codeflow.model.ConnectionType.BLUETOOTH -> connectionManager.connectViaBluetooth(device)
+            com.codeflow.model.ConnectionType.WIFI -> connectionManager.connectViaNetwork(device)
         }
-    }
-
-    private fun manualConnect() {
-        val input = binding.etIpAddress.text?.toString()?.trim() ?: return
-        if (input.isEmpty() || isConnecting) return
-        isConnecting = true
-
-        val parts = input.split(":")
-        val ip = parts[0]
-        val port = if (parts.size > 1) parts[1].toIntOrNull() ?: CodeFlowApp.TRANSFER_PORT
-            else CodeFlowApp.TRANSFER_PORT
-
-        val device = Device(
-            id = "manual_${ip}_${port}",
-            name = ip,
-            connectionType = ConnectionType.WIFI,
-            ipAddress = ip,
-            port = port
-        )
-
-        connectionManager.connectViaNetwork(device)
     }
 
     private fun openTransferActivity() {

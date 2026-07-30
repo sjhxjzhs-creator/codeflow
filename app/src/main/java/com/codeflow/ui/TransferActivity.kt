@@ -35,10 +35,6 @@ class TransferActivity : AppCompatActivity() {
         ActivityResultContracts.GetContent()
     ) { uri -> uri?.let { handleFileSelected(it) } }
 
-    private val pickImageLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { handleFileSelected(it) } }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityTransferBinding.inflate(layoutInflater)
@@ -76,7 +72,7 @@ class TransferActivity : AppCompatActivity() {
         }
 
         binding.btnAttach.setOnClickListener {
-            showFilePickerDialog()
+            pickFileLauncher.launch("*/*")
         }
 
         binding.btnSend.setOnClickListener {
@@ -145,22 +141,6 @@ class TransferActivity : AppCompatActivity() {
 
         connectionManager.sendTextMessage(text)
         binding.etMessage.text?.clear()
-    }
-
-    private fun showFilePickerDialog() {
-        val items = arrayOf(
-            getString(R.string.select_image),
-            getString(R.string.select_file)
-        )
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.select_file))
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> pickImageLauncher.launch("image/*")
-                    1 -> pickFileLauncher.launch("*/*")
-                }
-            }
-            .show()
     }
 
     private fun handleFileSelected(uri: Uri) {

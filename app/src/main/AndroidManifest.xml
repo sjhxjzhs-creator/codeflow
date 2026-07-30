@@ -55,6 +55,11 @@
             android:label="@string/transfer_title"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:label="设置"
+            android:parentActivityName=".ui.DeviceListActivity" />
+
         <service
             android:name=".transfer.TransferService"
             android:foregroundServiceType="dataSync"

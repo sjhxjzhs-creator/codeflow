@@ -48,8 +48,8 @@ class DeviceAdapter(
             }
             binding.ivDeviceIcon.setImageResource(
                 when (device.connectionType) {
-                    ConnectionType.BLUETOOTH -> android.R.drawable.ic_menu_compass
-                    ConnectionType.WIFI -> android.R.drawable.ic_menu_manage
+                    ConnectionType.BLUETOOTH -> R.drawable.ic_bluetooth
+                    ConnectionType.WIFI -> R.drawable.ic_wifi
                 }
             )
             binding.root.setOnClickListener { onDeviceClick(device) }

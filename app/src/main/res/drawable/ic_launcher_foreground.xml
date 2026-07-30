@@ -7,8 +7,23 @@
     <group
         android:translateX="22"
         android:translateY="22">
+
         <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M32,0C14.3,0 0,14.3 0,32c0,17.7 14.3,32 32,32s32,-14.3 32,-32C64,14.3 49.7,0 32,0zM40,44l-12,8V24l12,8v12z" />
+            android:fillColor="#2C3E50"
+            android:pathData="M32,2 A30,30 0 1,1 2,32 A30,30 0 0,1 32,2z" />
+
+        <path
+            android:fillColor="#3498DB"
+            android:pathData="M16,16 L32,16 L32,32 L16,32 z" />
+
+        <path
+            android:fillColor="#1ABC9C"
+            android:pathData="M32,16 L48,16 L48,32 L32,32 z" />
+
+        <path
+            android:fillColor="#E74C3C"
+            android:fillAlpha="0.9"
+            android:pathData="M24,32 L40,32 L40,48 L24,48 z" />
+
     </group>
 </vector>
