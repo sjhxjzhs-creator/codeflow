@@ -179,7 +179,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="下载 APK"
+                android:text="快速做一个这样的App"
                 android:textSize="14sp"
                 android:textColor="@color/primary"
                 android:textStyle="bold"
@@ -187,12 +187,12 @@
                 android:paddingBottom="8dp" />
 
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardDownload"
+                android:id="@+id/cardQuickApp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardElevation="2dp"
                 app:strokeWidth="0dp"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="16dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
@@ -201,23 +201,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:gravity="center"
                     android:padding="16dp">
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Bchat-v1.2.apk"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="5.9 MB | Android 8.0+"
                         android:textSize="13sp"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="4dp" />
+                        android:textColor="@color/text_primary"
+                        android:autoLink="web"
+                        android:linksClickable="true"
+                        android:text="https://monkeycode-ai.com/?ic=019fabe0-d0ac-73d4-9279-4374ebb4fd70" />
 
                 </LinearLayout>
 
@@ -370,45 +363,6 @@
                         android:autoLink="web"
                         android:linksClickable="false"
                         android:text="https://github.com/sjhxjzhs-creator/codeflow" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="下载 APK"
-                android:textSize="14sp"
-                android:textColor="@color/primary"
-                android:textStyle="bold"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:cardElevation="2dp"
-                app:strokeWidth="0dp"
-                android:layout_marginBottom="16dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_primary"
-                        android:autoLink="web"
-                        android:linksClickable="false"
-                        android:text="https://github.com/sjhxjzhs-creator/codeflow/releases/tag/v1.2" />
 
                 </LinearLayout>
 

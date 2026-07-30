@@ -29,7 +29,7 @@ class SettingsActivity : AppCompatActivity() {
         updateVersion()
         setupContactAuthor()
         setupGithubLink()
-        setupDownloadLink()
+        setupQuickAppLink()
     }
 
     private fun setupToolbar() {
@@ -96,10 +96,10 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupDownloadLink() {
-        binding.cardDownload.setOnClickListener {
+    private fun setupQuickAppLink() {
+        binding.cardQuickApp.setOnClickListener {
             try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sjhxjzhs-creator/codeflow/releases/latest"))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://monkeycode-ai.com/?ic=019fabe0-d0ac-73d4-9279-4374ebb4fd70"))
                 startActivity(intent)
             } catch (_: Exception) {
                 Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
