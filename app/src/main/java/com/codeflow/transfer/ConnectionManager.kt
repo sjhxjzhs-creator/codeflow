@@ -9,7 +9,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.*
-import java.net.Socket
 import java.util.UUID
 
 class ConnectionManager(context: Context) {
@@ -32,7 +31,9 @@ class ConnectionManager(context: Context) {
 
     var onMessageReceived: ((Message) -> Unit)? = null
     var onFileInfoReceived: ((TransferProtocol.FileInfo) -> Unit)? = null
-    var onFileDataReady: ((InputStream, String, Long) -> Unit)? = null
+    var onFileCompleted: ((String, String, Long) -> Unit)? = null
+    var onFileSendProgress: ((String, Int) -> Unit)? = null
+    var onFileReceiveProgress: ((String, Int) -> Unit)? = null
     var onConnectionRequest: ((String, String) -> Unit)? = null
 
     enum class ConnectionState {
@@ -78,7 +79,6 @@ class ConnectionManager(context: Context) {
         }
     }
 
-    // 主动连接对方设备（发起方，不弹窗）
     fun connectViaBluetooth(device: Device) {
         _connectionState.value = ConnectionState.CONNECTING
         bluetoothDiscovery.connectToDevice(device) { socket ->
@@ -134,22 +134,34 @@ class ConnectionManager(context: Context) {
     }
 
     fun sendLargeFile(fileInfo: TransferProtocol.FileInfo, fileInputStream: InputStream, fileSize: Long) {
-        sendPacket(TransferProtocol.PacketType.FILE_INFO, fileInfo)
+        sendPacketSync(TransferProtocol.PacketType.FILE_INFO, fileInfo)
 
         scope.launch {
             try {
-                outputStream?.let { os ->
-                    val dataOutput = DataOutputStream(os)
-                    dataOutput.writeLong(fileSize)
-                    val buffer = ByteArray(65536)
-                    var bytesRead: Int
-                    while (fileInputStream.read(buffer).also { bytesRead = it } > 0) {
-                        dataOutput.write(buffer, 0, bytesRead)
-                    }
-                    dataOutput.flush()
+                val os = outputStream ?: return@launch
+                val sizeBytes = ByteArray(8)
+                var sz = fileSize
+                for (i in 7 downTo 0) {
+                    sizeBytes[i] = (sz and 0xFF).toByte()
+                    sz = sz shr 8
                 }
-                sendPacket(TransferProtocol.PacketType.FILE_COMPLETE,
-                    mapOf("messageId" to fileInfo.messageId))
+                os.write(sizeBytes)
+
+                val buffer = ByteArray(65536)
+                var totalSent = 0L
+                var bytesRead: Int
+                while (fileInputStream.read(buffer).also { bytesRead = it } > 0) {
+                    os.write(buffer, 0, bytesRead)
+                    totalSent += bytesRead
+                    val progress = if (fileSize > 0) ((totalSent * 100) / fileSize).toInt() else 0
+                    withContext(Dispatchers.Main) {
+                        onFileSendProgress?.invoke(fileInfo.messageId, progress)
+                    }
+                }
+                os.flush()
+
+                sendPacketSync(TransferProtocol.PacketType.FILE_COMPLETE,
+                    mapOf("messageId" to fileInfo.messageId, "fileSize" to totalSent))
             } catch (e: IOException) {
                 e.printStackTrace()
             } finally {
@@ -205,7 +217,12 @@ class ConnectionManager(context: Context) {
                         continue
                     }
                     val (type, payload) = result
-                    handlePacket(type, payload)
+
+                    if (type == TransferProtocol.PacketType.FILE_INFO) {
+                        handleFileReceive(payload)
+                    } else {
+                        handlePacket(type, payload)
+                    }
                 }
             } catch (e: IOException) {
                 if (isActive) {
@@ -217,6 +234,70 @@ class ConnectionManager(context: Context) {
         }
     }
 
+    private suspend fun readFileDataLength(input: InputStream): Long {
+        var length = 0L
+        for (i in 0..7) {
+            val b = input.read()
+            if (b < 0) throw IOException("Unexpected EOF while reading file data length")
+            length = (length shl 8) or (b.toLong() and 0xFF)
+        }
+        return length
+    }
+
+    private suspend fun handleFileReceive(payload: ByteArray) {
+        try {
+            val fileInfo: TransferProtocol.FileInfo =
+                TransferProtocol.parsePayload(payload)
+
+            withContext(Dispatchers.Main) {
+                onFileInfoReceived?.invoke(fileInfo)
+            }
+
+            val input = inputStream ?: return
+            val dataSize = readFileDataLength(input)
+
+            val dir = File(CodeFlowApp.getAppContext().filesDir, "transfers")
+            dir.mkdirs()
+
+            var targetFile = File(dir, fileInfo.fileName)
+            if (targetFile.exists()) {
+                var counter = 1
+                val name = fileInfo.fileName.substringBeforeLast('.')
+                val ext = fileInfo.fileName.substringAfterLast('.', "")
+                while (true) {
+                    targetFile = if (ext.isNotEmpty())
+                        File(dir, "${name}($counter).$ext")
+                    else
+                        File(dir, "${name}($counter)")
+                    if (!targetFile.exists()) break
+                    counter++
+                }
+            }
+
+            targetFile.outputStream().use { fos ->
+                val buffer = ByteArray(65536)
+                var totalRead = 0L
+                while (totalRead < dataSize) {
+                    val remaining = (dataSize - totalRead).toInt().coerceAtMost(65536)
+                    val bytesRead = input.read(buffer, 0, remaining)
+                    if (bytesRead < 0) throw IOException("Unexpected EOF while reading file data")
+                    fos.write(buffer, 0, bytesRead)
+                    totalRead += bytesRead
+                    val progress = if (dataSize > 0) ((totalRead * 100) / dataSize).toInt() else 0
+                    withContext(Dispatchers.Main) {
+                        onFileReceiveProgress?.invoke(fileInfo.messageId, progress)
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                onFileCompleted?.invoke(fileInfo.messageId, targetFile.absolutePath, dataSize)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun handlePacket(type: TransferProtocol.PacketType, payload: ByteArray) {
         scope.launch(Dispatchers.Main) {
             try {
@@ -225,7 +306,6 @@ class ConnectionManager(context: Context) {
                         val request: TransferProtocol.ConnectionRequest =
                             TransferProtocol.parsePayload(payload)
                         _connectionState.value = ConnectionState.WAITING_FOR_REQUEST
-                        // 通知UI，由UI弹出接受/拒绝对话框
                         onConnectionRequest?.invoke(request.deviceName, request.connectionType)
                     }
                     TransferProtocol.PacketType.CONNECTION_ACCEPT -> {
@@ -247,19 +327,7 @@ class ConnectionManager(context: Context) {
                         )
                         onMessageReceived?.invoke(message)
                     }
-                    TransferProtocol.PacketType.FILE_INFO -> {
-                        val fileInfo: TransferProtocol.FileInfo =
-                            TransferProtocol.parsePayload(payload)
-                        onFileInfoReceived?.invoke(fileInfo)
-                        scope.launch(Dispatchers.IO) {
-                            try {
-                                val dataInput = DataInputStream(inputStream)
-                                val dataSize = dataInput.readLong()
-                                onFileDataReady?.invoke(inputStream!!, fileInfo.fileName, dataSize)
-                            } catch (e: IOException) {
-                                e.printStackTrace()
-                            }
-                        }
+                    TransferProtocol.PacketType.FILE_COMPLETE -> {
                     }
                     TransferProtocol.PacketType.DISCONNECT -> {
                         disconnect()
@@ -281,6 +349,16 @@ class ConnectionManager(context: Context) {
             } catch (e: IOException) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun sendPacketSync(type: TransferProtocol.PacketType, payload: Any) {
+        try {
+            outputStream?.let {
+                TransferProtocol.writePacket(it, type, payload)
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
         }
     }
 

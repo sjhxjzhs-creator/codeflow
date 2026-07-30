@@ -173,7 +173,7 @@ class DeviceListActivity : AppCompatActivity() {
 
         connectionManager.onMessageReceived = { /* handled in TransferActivity */ }
         connectionManager.onFileInfoReceived = { /* handled in TransferActivity */ }
-        connectionManager.onFileDataReady = { _, _, _ -> /* handled in TransferActivity */ }
+        connectionManager.onFileCompleted = { _, _, _ -> /* handled in TransferActivity */ }
     }
 
     private fun requestPermissions() {

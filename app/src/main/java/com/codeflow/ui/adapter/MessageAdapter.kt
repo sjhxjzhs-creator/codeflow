@@ -41,6 +41,15 @@ class MessageAdapter(
         }
     }
 
+    fun updateMessageFile(messageId: String, filePath: String) {
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index >= 0) {
+            val msg = messages[index]
+            messages[index] = msg.copy(status = MessageStatus.RECEIVED, filePath = filePath)
+            notifyItemChanged(index)
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemMessageBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
@@ -104,12 +113,15 @@ class MessageAdapter(
             binding.tvFileName.text = message.fileName ?: "Unknown"
             binding.tvFileSize.text = formatFileSize(message.fileSize)
 
-            val icon = when {
-                message.fileName?.let { isImageFile(it) } == true -> "\uD83D\uDCF7"
-                message.fileName?.let { isVideoFile(it) } == true -> "\uD83C\uDFA5"
-                else -> "\uD83D\uDCC4"
+            val iconRes = when {
+                message.fileName?.let { isImageFile(it) } == true -> R.drawable.ic_file_image
+                message.fileName?.let { isVideoFile(it) } == true -> R.drawable.ic_file_video
+                message.fileName?.let { isAudioFile(it) } == true -> R.drawable.ic_file_audio
+                message.fileName?.let { isApkFile(it) } == true -> R.drawable.ic_file_apk
+                message.fileName?.let { isDocFile(it) } == true -> R.drawable.ic_file_document
+                else -> R.drawable.ic_file_generic
             }
-            binding.tvFileIcon.text = icon
+            binding.ivFileIcon.setImageResource(iconRes)
 
             if (message.status == MessageStatus.SENDING || message.status == MessageStatus.RECEIVING) {
                 binding.progressFile.visibility = View.VISIBLE
@@ -175,6 +187,20 @@ class MessageAdapter(
         private fun isVideoFile(fileName: String): Boolean {
             val ext = fileName.substringAfterLast('.', "").lowercase()
             return ext in listOf("mp4", "avi", "mkv", "mov", "flv", "wmv")
+        }
+
+        private fun isAudioFile(fileName: String): Boolean {
+            val ext = fileName.substringAfterLast('.', "").lowercase()
+            return ext in listOf("mp3", "wav", "flac", "aac", "ogg", "wma", "m4a")
+        }
+
+        private fun isApkFile(fileName: String): Boolean {
+            return fileName.substringAfterLast('.', "").lowercase() == "apk"
+        }
+
+        private fun isDocFile(fileName: String): Boolean {
+            val ext = fileName.substringAfterLast('.', "").lowercase()
+            return ext in listOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv")
         }
     }
 

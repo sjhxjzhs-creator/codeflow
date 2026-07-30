@@ -14,6 +14,8 @@ class CodeFlowApp : Application() {
 
         lateinit var instance: CodeFlowApp
             private set
+
+        fun getAppContext(): Application = instance
     }
 
     val connectionManager: ConnectionManager by lazy {

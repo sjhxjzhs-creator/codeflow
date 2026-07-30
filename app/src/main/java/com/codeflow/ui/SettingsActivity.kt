@@ -2,6 +2,7 @@ package com.codeflow.ui
 
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -26,6 +27,7 @@ class SettingsActivity : AppCompatActivity() {
         updateDeviceInfo()
         setupDiscoverableButton()
         updateVersion()
+        setupContactAuthor()
     }
 
     private fun setupToolbar() {
@@ -67,6 +69,17 @@ class SettingsActivity : AppCompatActivity() {
             Toast.makeText(this, "已取消可被发现", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "设备将在 ${result.resultCode} 秒内可被发现", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun setupContactAuthor() {
+        binding.cardContact.setOnClickListener {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://b23.tv/6Ih36mU"))
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "无法打开链接", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

@@ -33,7 +33,11 @@ class TransferActivity : AppCompatActivity() {
 
     private val pickFileLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { handleFileSelected(it) } }
+    ) { uri ->
+        if (uri != null) {
+            handleFileSelected(uri)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,25 +116,23 @@ class TransferActivity : AppCompatActivity() {
             }
         }
 
-        connectionManager.onFileDataReady = { inputStream, fileName, size ->
-            lifecycleScope.launch {
-                val dir = File(filesDir, "transfers").also { it.mkdirs() }
-                val file = File(dir, fileName)
-                try {
-                    file.outputStream().use { fos ->
-                        val buffer = ByteArray(65536)
-                        var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } > 0) {
-                            fos.write(buffer, 0, bytesRead)
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                runOnUiThread {
-                    Toast.makeText(this@TransferActivity,
-                        "$fileName ${getString(R.string.file_received)}", Toast.LENGTH_SHORT).show()
-                }
+        connectionManager.onFileSendProgress = { messageId, progress ->
+            runOnUiThread {
+                messageAdapter.updateMessage(messageId, MessageStatus.SENDING, progress)
+            }
+        }
+
+        connectionManager.onFileReceiveProgress = { messageId, progress ->
+            runOnUiThread {
+                messageAdapter.updateMessage(messageId, MessageStatus.RECEIVING, progress)
+            }
+        }
+
+        connectionManager.onFileCompleted = { messageId, filePath, _ ->
+            runOnUiThread {
+                messageAdapter.updateMessage(messageId, MessageStatus.RECEIVED, 100)
+                messageAdapter.updateMessageFile(messageId, filePath)
+                Toast.makeText(this, "文件接收完成", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -152,8 +154,9 @@ class TransferActivity : AppCompatActivity() {
                     val fileName = if (nameIndex >= 0) cursor.getString(nameIndex) else "unknown"
                     val fileSize = if (sizeIndex >= 0) cursor.getLong(sizeIndex) else 0L
 
+                    val messageId = java.util.UUID.randomUUID().toString()
                     val fileInfo = TransferProtocol.FileInfo(
-                        messageId = java.util.UUID.randomUUID().toString(),
+                        messageId = messageId,
                         fileName = fileName,
                         fileSize = fileSize,
                         fileType = getFileType(fileName),
@@ -162,10 +165,8 @@ class TransferActivity : AppCompatActivity() {
 
                     val inputStream = contentResolver.openInputStream(uri)
                     inputStream?.let { stream ->
-                        connectionManager.sendLargeFile(fileInfo, stream, fileSize)
-
                         val message = Message(
-                            id = fileInfo.messageId,
+                            id = messageId,
                             type = if (isImageFile(fileName)) MessageType.IMAGE else MessageType.FILE,
                             content = fileName,
                             fileName = fileName,
@@ -175,6 +176,19 @@ class TransferActivity : AppCompatActivity() {
                         )
                         messageAdapter.addMessage(message)
                         scrollToBottom()
+
+                        connectionManager.sendLargeFile(fileInfo, stream, fileSize)
+
+                        connectionManager.onFileSendProgress = { msgId, progress ->
+                            runOnUiThread {
+                                if (msgId == messageId) {
+                                    messageAdapter.updateMessage(msgId, MessageStatus.SENDING, progress)
+                                    if (progress >= 100) {
+                                        messageAdapter.updateMessage(msgId, MessageStatus.SENT, 100)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
