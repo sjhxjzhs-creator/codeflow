@@ -378,7 +378,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="如何快速做出这样的App"
+                android:text="下载 APK"
                 android:textSize="14sp"
                 android:textColor="@color/primary"
                 android:textStyle="bold"
@@ -386,11 +386,15 @@
                 android:paddingBottom="8dp" />
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardDownload"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardElevation="2dp"
                 app:strokeWidth="0dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -401,11 +405,11 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_primary"
                         android:autoLink="web"
-                        android:linksClickable="true"
-                        android:text="https://monkeycode-ai.com/?ic=019fabe0-d0ac-73d4-9279-4374ebb4fd70" />
+                        android:linksClickable="false"
+                        android:text="https://github.com/sjhxjzhs-creator/codeflow/releases/tag/v1.2" />
 
                 </LinearLayout>
 
