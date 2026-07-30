@@ -122,7 +122,7 @@ class TransferService : Service() {
                 "文件传输",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "CodeFlow 文件传输服务"
+                description = "Bchat 文件传输服务"
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
@@ -137,7 +137,7 @@ class TransferService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("CodeFlow")
+            .setContentTitle("Bchat")
             .setContentText("已连接到 $connectedDeviceName")
             .setSmallIcon(android.R.drawable.ic_menu_send)
             .setContentIntent(pendingIntent)
