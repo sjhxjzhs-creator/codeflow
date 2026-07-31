@@ -6,29 +6,29 @@
         android:id="@+id/action_bluetooth"
         android:title="蓝牙"
         android:icon="@drawable/ic_bluetooth"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_wifi"
         android:title="WiFi"
         android:icon="@drawable/ic_wifi"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_friends"
         android:title="好友"
         android:icon="@drawable/ic_friends"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_search"
         android:title="搜索"
         android:icon="@drawable/ic_search"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_settings"
         android:title="设置"
         android:icon="@drawable/ic_settings"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 </menu>

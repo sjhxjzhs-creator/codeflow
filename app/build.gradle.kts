@@ -13,8 +13,8 @@ android {
         applicationId = "com.codeflow"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 8
+        versionName = "2.2"
     }
 
     buildTypes {

@@ -271,6 +271,10 @@ class DeviceListActivity : AppCompatActivity() {
                         ConnectionManager.ConnectionState.CONNECTING -> {
                             binding.progressBar.visibility = View.VISIBLE
                         }
+                        ConnectionManager.ConnectionState.AWAITING_ACCEPT -> {
+                            // 已连接到对方，等待对方接受
+                            binding.progressBar.visibility = View.VISIBLE
+                        }
                         ConnectionManager.ConnectionState.CONNECTED -> {
                             binding.progressBar.visibility = View.GONE
                             isConnecting = false

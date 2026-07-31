@@ -40,6 +40,7 @@ class ConnectionManager(context: Context) {
         DISCONNECTED,
         WAITING_FOR_REQUEST,
         CONNECTING,
+        AWAITING_ACCEPT,
         CONNECTED
     }
 
@@ -85,7 +86,7 @@ class ConnectionManager(context: Context) {
             setupBluetoothStreams(socket.inputStream, socket.outputStream)
             activeConnection = ConnectionType.BLUETOOTH
             startReading(ConnectionType.BLUETOOTH)
-            _connectionState.value = ConnectionState.CONNECTED
+            _connectionState.value = ConnectionState.AWAITING_ACCEPT
             sendConnectionRequest(device)
         }
     }
@@ -96,7 +97,7 @@ class ConnectionManager(context: Context) {
             setupNetworkStreams(socket.getInputStream(), socket.getOutputStream())
             activeConnection = ConnectionType.WIFI
             startReading(ConnectionType.WIFI)
-            _connectionState.value = ConnectionState.CONNECTED
+            _connectionState.value = ConnectionState.AWAITING_ACCEPT
             sendConnectionRequest(device)
         }
     }
