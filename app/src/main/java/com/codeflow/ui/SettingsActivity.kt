@@ -1,11 +1,13 @@
 package com.codeflow.ui
 
 import android.bluetooth.BluetoothAdapter
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import com.codeflow.CodeFlowApp
 import com.codeflow.R
 import com.codeflow.databinding.ActivitySettingsBinding
@@ -30,6 +32,47 @@ class SettingsActivity : AppCompatActivity() {
         setupContactAuthor()
         setupGithubLink()
         setupQuickAppLink()
+        setupPersonalization()
+    }
+
+    // ==================== 个性化 ====================
+
+    private fun prefs() = getSharedPreferences("bchat_prefs", Context.MODE_PRIVATE)
+
+    private fun savedThemeMode(): Int =
+        prefs().getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+
+    private fun persistThemeMode(mode: Int) {
+        prefs().edit().putInt("theme_mode", mode).apply()
+    }
+
+    private fun themeModeLabel(mode: Int): String = when (mode) {
+        AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM -> "跟随系统"
+        AppCompatDelegate.MODE_NIGHT_NO -> "浅色"
+        else -> "深色"
+    }
+
+    private fun nextThemeMode(current: Int): Int = when (current) {
+        AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM -> AppCompatDelegate.MODE_NIGHT_NO
+        AppCompatDelegate.MODE_NIGHT_NO -> AppCompatDelegate.MODE_NIGHT_YES
+        else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    }
+
+    private fun setupPersonalization() {
+        // 外观模式：跟随系统 -> 浅色 -> 深色 循环
+        binding.tvThemeValue.text = themeModeLabel(savedThemeMode())
+        binding.rowTheme.setOnClickListener {
+            val next = nextThemeMode(savedThemeMode())
+            persistThemeMode(next)
+            AppCompatDelegate.setDefaultNightMode(next)
+            binding.tvThemeValue.text = themeModeLabel(next)
+        }
+
+        // 液态玻璃：当前为资源级效果，记录偏好（默认开启）
+        binding.swGlass.isChecked = prefs().getBoolean("glass_enabled", true)
+        binding.swGlass.setOnCheckedChangeListener { _, isChecked ->
+            prefs().edit().putBoolean("glass_enabled", isChecked).apply()
+        }
     }
 
     private fun setupToolbar() {

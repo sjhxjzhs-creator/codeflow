@@ -1,6 +1,8 @@
 package com.codeflow
 
 import android.app.Application
+import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
 import com.codeflow.transfer.ConnectionManager
 import com.codeflow.transfer.GroupManager
 
@@ -30,5 +32,9 @@ class CodeFlowApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // 应用持久化的外观模式（跟随系统 / 浅色 / 深色）
+        val mode = getSharedPreferences("bchat_prefs", Context.MODE_PRIVATE)
+            .getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        AppCompatDelegate.setDefaultNightMode(mode)
     }
 }
