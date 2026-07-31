@@ -135,7 +135,7 @@ class MessageAdapter(
                 textParams.gravity = Gravity.END
                 binding.layoutText.setBackgroundResource(0)
                 binding.layoutText.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_sent), 18f
+                    binding.root.context.getColor(R.color.bubble_sent), bubbleRadius()
                 )
                 binding.tvStatus.text = when (message.status) {
                     MessageStatus.SENDING -> "..."
@@ -148,7 +148,7 @@ class MessageAdapter(
                 textParams.gravity = Gravity.START
                 binding.layoutText.setBackgroundResource(0)
                 binding.layoutText.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_received), 18f
+                    binding.root.context.getColor(R.color.bubble_received), bubbleRadius()
                 )
                 binding.layoutTextFooter.visibility = View.VISIBLE
                 binding.tvStatus.visibility = View.GONE
@@ -194,13 +194,13 @@ class MessageAdapter(
                 fileParams.gravity = Gravity.END
                 binding.layoutFile.setBackgroundResource(0)
                 binding.layoutFile.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_sent), 18f
+                    binding.root.context.getColor(R.color.bubble_sent), bubbleRadius()
                 )
             } else {
                 fileParams.gravity = Gravity.START
                 binding.layoutFile.setBackgroundResource(0)
                 binding.layoutFile.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_received), 18f
+                    binding.root.context.getColor(R.color.bubble_received), bubbleRadius()
                 )
             }
             binding.layoutFile.layoutParams = fileParams
@@ -236,13 +236,13 @@ class MessageAdapter(
                 voiceParams.gravity = Gravity.END
                 binding.layoutVoice.setBackgroundResource(0)
                 binding.layoutVoice.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_sent), 18f
+                    binding.root.context.getColor(R.color.bubble_sent), bubbleRadius()
                 )
             } else {
                 voiceParams.gravity = Gravity.START
                 binding.layoutVoice.setBackgroundResource(0)
                 binding.layoutVoice.background = roundedRect(
-                    binding.root.context.getColor(R.color.bubble_received), 18f
+                    binding.root.context.getColor(R.color.bubble_received), bubbleRadius()
                 )
             }
             binding.layoutVoice.layoutParams = voiceParams
@@ -267,9 +267,19 @@ class MessageAdapter(
 
             binding.layoutText.setBackgroundResource(0)
             binding.layoutText.background = roundedRect(
-                binding.root.context.resources.getColor(android.R.color.darker_gray, null),
-                12f
+                binding.root.context.getColor(R.color.system_bubble),
+                chipRadius()
             )
+        }
+
+        private fun bubbleRadius(): Float {
+            return binding.root.context.resources.getDimension(R.dimen.bubble_corner_radius) /
+                binding.root.context.resources.displayMetrics.density
+        }
+
+        private fun chipRadius(): Float {
+            return binding.root.context.resources.getDimension(R.dimen.chip_corner_radius) /
+                binding.root.context.resources.displayMetrics.density
         }
 
         private fun roundedRect(color: Int, radius: Float): android.graphics.drawable.GradientDrawable {
@@ -278,7 +288,6 @@ class MessageAdapter(
                 cornerRadius = radius * binding.root.context.resources.displayMetrics.density
             }
         }
-
         private fun isImageFile(fileName: String): Boolean {
             val ext = fileName.substringAfterLast('.', "").lowercase()
             return ext in listOf("jpg", "jpeg", "png", "gif", "bmp", "webp", "heic")

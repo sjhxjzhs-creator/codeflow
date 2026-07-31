@@ -16,6 +16,7 @@
     <color name="error">#EF5350</color>
     <color name="bubble_sent">#1565C0</color>
     <color name="bubble_received">#30363D</color>
+    <color name="system_bubble">#30363D</color>
     <color name="connected_bg">#10251A</color>
     <color name="tag_bluetooth">#1E88E5</color>
     <color name="tag_wifi">#43A047</color>

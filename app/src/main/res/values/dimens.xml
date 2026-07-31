@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 统一圆角 -->
+    <dimen name="bubble_corner_radius">18dp</dimen>
+    <dimen name="card_corner_radius">12dp</dimen>
+    <dimen name="chip_corner_radius">10dp</dimen>
+    <dimen name="screen_padding">16dp</dimen>
+</resources>
