@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 液态玻璃卡片：半透明白 + 细边框高光 + 圆角 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:bottom="-8dp" android:left="-8dp" android:right="-8dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E8FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+</layer-list>

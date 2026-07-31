@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 液态玻璃底栏：半透明 + 顶部高光描边，近似模糊玻璃 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 上部高光细线 -->
+    <item android:top="0dp">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <gradient
+                android:startColor="#66FFFFFF"
+                android:endColor="#00FFFFFF"
+                android:angle="0" />
+        </shape>
+    </item>
+    <!-- 半透明白色主体 -->
+    <item android:top="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E6FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

@@ -42,7 +42,7 @@
         tools:targetApi="34">
 
         <activity
-            android:name=".ui.DeviceListActivity"
+            android:name=".ui.MainActivity"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -57,14 +57,9 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".ui.SettingsActivity"
-            android:label="设置"
-            android:parentActivityName=".ui.DeviceListActivity" />
-
-        <activity
             android:name=".ui.GroupChatActivity"
             android:label="群聊"
-            android:parentActivityName=".ui.DeviceListActivity"
+            android:parentActivityName=".ui.MainActivity"
             android:windowSoftInputMode="adjustResize" />
 
         <service
