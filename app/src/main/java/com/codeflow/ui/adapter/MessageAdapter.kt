@@ -117,6 +117,7 @@ class MessageAdapter(
         private fun bindTextMessage(message: Message) {
             binding.layoutText.visibility = View.VISIBLE
             binding.layoutFile.visibility = View.GONE
+            binding.layoutVoice.visibility = View.GONE
 
             if (groupMode && !message.isFromMe) {
                 binding.tvSenderName.visibility = View.VISIBLE
@@ -158,6 +159,7 @@ class MessageAdapter(
         private fun bindFileMessage(message: Message) {
             binding.layoutText.visibility = View.GONE
             binding.layoutFile.visibility = View.VISIBLE
+            binding.layoutVoice.visibility = View.GONE
             binding.tvFileName.text = message.fileName ?: "Unknown"
             binding.tvFileSize.text = formatFileSize(message.fileSize)
 
@@ -255,6 +257,7 @@ class MessageAdapter(
         private fun bindSystemMessage(message: Message) {
             binding.layoutText.visibility = View.VISIBLE
             binding.layoutFile.visibility = View.GONE
+            binding.layoutVoice.visibility = View.GONE
             binding.tvContent.text = message.content
             binding.layoutTextFooter.visibility = View.GONE
 
