@@ -30,5 +30,6 @@ data class Message(
     val isFromMe: Boolean,
     val status: MessageStatus = MessageStatus.SENDING,
     val timestamp: Long = System.currentTimeMillis(),
-    val progress: Int = 0
+    val progress: Int = 0,
+    val senderName: String? = null
 ) : Parcelable

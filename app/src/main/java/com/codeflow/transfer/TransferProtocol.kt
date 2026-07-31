@@ -33,7 +33,17 @@ object TransferProtocol {
         FILE_DATA("file_data"),
         FILE_COMPLETE("file_complete"),
         DISCONNECT("disconnect"),
-        DEVICE_INFO("device_info");
+        DEVICE_INFO("device_info"),
+        // 群聊相关
+        GROUP_ANNOUNCE("group_announce"),
+        GROUP_JOIN("group_join"),
+        GROUP_ACCEPT("group_accept"),
+        GROUP_REJECT("group_reject"),
+        GROUP_MSG("group_msg"),
+        GROUP_FILE("group_file"),
+        GROUP_LEAVE("group_leave"),
+        GROUP_DISBAND("group_disband"),
+        GROUP_MEMBERS("group_members");
 
         companion object {
             fun fromValue(value: String): PacketType? =
@@ -67,11 +77,99 @@ object TransferProtocol {
         @SerializedName("timestamp") val timestamp: Long
     )
 
+    // ---- 群聊相关数据类 ----
+
+    data class GroupAnnounce(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("groupName") val groupName: String,
+        @SerializedName("hostName") val hostName: String,
+        @SerializedName("hostIp") val hostIp: String,
+        @SerializedName("port") val port: Int,
+        @SerializedName("hasPassword") val hasPassword: Boolean,
+        @SerializedName("memberCount") val memberCount: Int,
+        @SerializedName("timestamp") val timestamp: Long
+    )
+
+    data class GroupJoinRequest(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("nickname") val nickname: String,
+        @SerializedName("password") val password: String?,
+        @SerializedName("memberId") val memberId: String,
+        @SerializedName("timestamp") val timestamp: Long
+    )
+
+    data class GroupJoinResult(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("groupName") val groupName: String,
+        @SerializedName("accepted") val accepted: Boolean,
+        @SerializedName("reason") val reason: String?,
+        @SerializedName("hostName") val hostName: String? = null,
+        @SerializedName("members") val members: List<GroupMemberDto> = emptyList()
+    )
+
+    data class GroupMemberDto(
+        @SerializedName("memberId") val memberId: String,
+        @SerializedName("nickname") val nickname: String,
+        @SerializedName("isHost") val isHost: Boolean = false
+    )
+
+    data class GroupMessage(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("content") val content: String,
+        @SerializedName("type") val type: String,
+        @SerializedName("filePath") val filePath: String? = null,
+        @SerializedName("fileName") val fileName: String? = null,
+        @SerializedName("fileSize") val fileSize: Long = 0,
+        @SerializedName("senderId") val senderId: String,
+        @SerializedName("senderName") val senderName: String,
+        @SerializedName("timestamp") val timestamp: Long
+    )
+
+    data class GroupMembers(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("members") val members: List<GroupMemberDto>
+    )
+
+    data class GroupLeave(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("memberId") val memberId: String,
+        @SerializedName("nickname") val nickname: String? = null,
+        @SerializedName("reason") val reason: String? = null
+    )
+
+    data class GroupFileHeader(
+        @SerializedName("groupId") val groupId: String,
+        @SerializedName("fileName") val fileName: String,
+        @SerializedName("fileSize") val fileSize: Long,
+        @SerializedName("senderId") val senderId: String,
+        @SerializedName("senderName") val senderName: String,
+        @SerializedName("timestamp") val timestamp: Long
+    )
+
     fun writePacket(output: OutputStream, type: PacketType, payload: Any) {
         val jsonPayload = gson.toJson(payload)
         val payloadBytes = jsonPayload.toByteArray(Charsets.UTF_8)
 
         val headerSize = 4 + 2 + 16 + 4 // magic + version + type + payloadSize
+        val totalSize = headerSize + payloadBytes.size
+
+        val buffer = ByteBuffer.allocate(totalSize)
+        buffer.putInt(HEADER_MAGIC)
+        buffer.putShort(PROTOCOL_VERSION)
+        val typeBytes = ByteArray(16)
+        val typeStr = type.value
+        System.arraycopy(typeStr.toByteArray(Charsets.UTF_8), 0, typeBytes, 0, minOf(typeStr.length, 16))
+        buffer.put(typeBytes)
+        buffer.putInt(payloadBytes.size)
+        buffer.put(payloadBytes)
+
+        output.write(buffer.array())
+        output.flush()
+    }
+
+    // 发送原始字节 payload（不进行 JSON 编码），用于文件等二进制数据
+    fun writeRawPacket(output: OutputStream, type: PacketType, payloadBytes: ByteArray) {
+        val headerSize = 4 + 2 + 16 + 4
         val totalSize = headerSize + payloadBytes.size
 
         val buffer = ByteBuffer.allocate(totalSize)

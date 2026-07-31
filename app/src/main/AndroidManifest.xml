@@ -60,6 +60,12 @@
             android:label="设置"
             android:parentActivityName=".ui.DeviceListActivity" />
 
+        <activity
+            android:name=".ui.GroupChatActivity"
+            android:label="群聊"
+            android:parentActivityName=".ui.DeviceListActivity"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".transfer.TransferService"
             android:foregroundServiceType="dataSync"

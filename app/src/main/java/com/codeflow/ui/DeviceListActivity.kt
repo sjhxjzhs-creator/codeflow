@@ -23,8 +23,12 @@ import com.codeflow.R
 import com.codeflow.databinding.ActivityDeviceListBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
+import com.codeflow.model.Group
+import com.codeflow.model.GroupSession
 import com.codeflow.transfer.ConnectionManager
+import com.codeflow.transfer.GroupManager
 import com.codeflow.ui.adapter.DeviceAdapter
+import com.codeflow.ui.adapter.GroupAdapter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.collectLatest
@@ -35,8 +39,10 @@ class DeviceListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDeviceListBinding
     private lateinit var connectionManager: ConnectionManager
+    private lateinit var groupManager: GroupManager
     private lateinit var prefs: SharedPreferences
     private lateinit var deviceAdapter: DeviceAdapter
+    private lateinit var groupAdapter: GroupAdapter
     
     private var isConnecting = false
     private var pendingDeviceForFriend: Device? = null
@@ -76,6 +82,7 @@ class DeviceListActivity : AppCompatActivity() {
         loadSavedFriends()
 
         connectionManager = (application as CodeFlowApp).connectionManager
+        groupManager = (application as CodeFlowApp).groupManager
         
         setupDeviceInfo()
         setupUI()
@@ -133,6 +140,9 @@ class DeviceListActivity : AppCompatActivity() {
                 initiateConnection(device)
             }
         }
+        groupAdapter = GroupAdapter { group ->
+            joinGroupByEntry(group)
+        }
         binding.rvDevices.apply {
             layoutManager = LinearLayoutManager(this@DeviceListActivity)
             adapter = deviceAdapter
@@ -187,20 +197,27 @@ class DeviceListActivity : AppCompatActivity() {
         when (mode) {
             Mode.BLUETOOTH -> {
                 binding.friendActionsLayout.visibility = View.GONE
+                binding.rvDevices.adapter = deviceAdapter
                 refreshDevices()
             }
             Mode.WIFI -> {
                 binding.friendActionsLayout.visibility = View.GONE
+                binding.rvDevices.adapter = deviceAdapter
                 refreshDevices()
             }
             Mode.FRIENDS -> {
                 binding.friendActionsLayout.visibility = View.VISIBLE
+                binding.rvDevices.adapter = deviceAdapter
                 showFriendsView()
             }
             Mode.CHAT_ROOMS -> {
                 binding.friendActionsLayout.visibility = View.GONE
                 showChatRoomsView()
             }
+        }
+
+        if (mode != Mode.CHAT_ROOMS) {
+            groupManager.stopGroupDiscovery()
         }
     }
 
@@ -210,8 +227,21 @@ class DeviceListActivity : AppCompatActivity() {
     }
     
     private fun showChatRoomsView() {
-        deviceAdapter.submitList(emptyList())
-        updateEmptyView(true, "聊天室功能开发中")
+        binding.rvDevices.adapter = groupAdapter
+        groupAdapter.submitList(groupManager.discoveredGroups)
+        updateEmptyView(groupManager.discoveredGroups.isEmpty(), "暂无可用群聊\n好友发起的群聊会出现在这里")
+
+        // 启动群发现
+        groupManager.startGroupDiscovery { _ ->
+            refreshDiscoveredGroups()
+        }
+        // 首次也刷新一次
+        refreshDiscoveredGroups()
+    }
+
+    private fun refreshDiscoveredGroups() {
+        groupAdapter.submitList(groupManager.discoveredGroups)
+        updateEmptyView(groupManager.discoveredGroups.isEmpty(), "暂无可用群聊\n好友发起的群聊会出现在这里")
     }
 
     private fun observeState() {
@@ -340,22 +370,201 @@ class DeviceListActivity : AppCompatActivity() {
         }
     }
     
+    // ==================== 群聊相关 ====================
+
+    // 点击群列表条目进群
+    private fun joinGroupByEntry(group: Group) {
+        // 输入一次性昵称
+        promptNickname { nickname ->
+            if (group.hasPassword) {
+                promptPassword { password ->
+                    doJoinGroup(group, nickname, password)
+                }
+            } else {
+                doJoinGroup(group, nickname, password = null)
+            }
+        }
+    }
+
+    private fun doJoinGroup(group: Group, nickname: String, password: String?) {
+        val result = groupManager.joinGroup(
+            hostIp = group.hostIp,
+            port = group.hostPort,
+            groupId = group.id,
+            groupName = group.name,
+            password = password,
+            nickname = nickname
+        )
+        if (result.isSuccess) {
+            openGroupChat(groupManager.currentSession)
+        } else {
+            Toast.makeText(this, "加入失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
     private fun showCreateGroupDialog() {
+        val context = this
+        val nicknameInput = android.widget.EditText(context).apply {
+            hint = "你的昵称（如：小明）"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val nameInput = android.widget.EditText(context).apply {
+            hint = "群聊名称"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val passwordInput = android.widget.EditText(context).apply {
+            hint = "入群密码（可选，留空则免密）"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val layout = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, 0)
+            addView(nicknameInput)
+            addView(nameInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
+                topMargin = pad
+            })
+            addView(passwordInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
+                topMargin = pad
+            })
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("群聊功能")
-            .setMessage("群聊功能开发中，敬请期待！")
-            .setPositiveButton("好的", null)
+            .setTitle("发起群聊")
+            .setView(layout)
+            .setPositiveButton("创建") { _, _ ->
+                val nickname = nicknameInput.text.toString().trim()
+                val groupName = nameInput.text.toString().trim()
+                if (nickname.isEmpty() || groupName.isEmpty()) {
+                    Toast.makeText(this, "请填写昵称和群名", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val password = passwordInput.text.toString().trim().takeIf { it.isNotEmpty() }
+                val result = groupManager.createGroup(groupName, password, nickname)
+                if (result.isSuccess) {
+                    Toast.makeText(this, "群聊已创建，可在群聊页看到", Toast.LENGTH_SHORT).show()
+                    openGroupChat(groupManager.currentSession)
+                } else {
+                    Toast.makeText(this, "创建失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
-    
+
     private fun showJoinGroupDialog() {
+        val context = this
+        val nicknameInput = android.widget.EditText(context).apply {
+            hint = "你的昵称"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val addressInput = android.widget.EditText(context).apply {
+            hint = "输入 IP:端口（如 192.168.1.5:53319）"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val passwordInput = android.widget.EditText(context).apply {
+            hint = "入群密码（如有）"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val layout = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, 0)
+            addView(nicknameInput)
+            addView(addressInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
+                topMargin = pad
+            })
+            addView(passwordInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
+                topMargin = pad
+            })
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("群聊功能")
-            .setMessage("群聊功能开发中，敬请期待！")
-            .setPositiveButton("好的", null)
+            .setTitle("加入群聊")
+            .setView(layout)
+            .setPositiveButton("加入") { _, _ ->
+                val nickname = nicknameInput.text.toString().trim()
+                val address = addressInput.text.toString().trim()
+                if (nickname.isEmpty() || address.isEmpty()) {
+                    Toast.makeText(this, "请填写昵称和地址", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val parts = address.split(":")
+                if (parts.size < 2 || parts[0].isBlank() || parts[1].toIntOrNull() == null) {
+                    Toast.makeText(this, "地址格式错误，应为 IP:端口", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val ip = parts[0].trim()
+                val port = parts[1].trim().toInt()
+                val password = passwordInput.text.toString().trim().takeIf { it.isNotEmpty() }
+
+                // 直接通过 IP:Port 加入，groupId 未知，用占位
+                val group = Group(
+                    id = "manual", name = "", hostName = "",
+                    hostIp = ip, hostPort = port,
+                    hasPassword = !password.isNullOrEmpty()
+                )
+                val result = groupManager.joinGroup(
+                    hostIp = ip, port = port, groupId = "manual",
+                    groupName = "", password = password, nickname = nickname
+                )
+                if (result.isSuccess) {
+                    openGroupChat(groupManager.currentSession)
+                } else {
+                    Toast.makeText(this, "加入失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("取消", null)
             .show()
     }
-    
+
+    private fun promptNickname(onResult: (String) -> Unit) {
+        val input = android.widget.EditText(this).apply {
+            hint = "请输入一次性昵称"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("设置昵称")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val nickname = input.text.toString().trim()
+                if (nickname.isEmpty()) {
+                    Toast.makeText(this, "昵称不能为空", Toast.LENGTH_SHORT).show()
+                } else {
+                    onResult(nickname)
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun promptPassword(onResult: (String) -> Unit) {
+        val input = android.widget.EditText(this).apply {
+            hint = "请输入入群密码"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this)
+            .setTitle("输入密码")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                onResult(input.text.toString())
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun openGroupChat(session: GroupSession?) {
+        if (session == null) {
+            Toast.makeText(this, "群会话创建失败", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(this, GroupChatActivity::class.java)
+        intent.putExtra(GroupChatActivity.EXTRA_SESSION, Gson().toJson(session))
+        startActivity(intent)
+    }
+
+    private val match = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+    private val wrap = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+
     // 连接成功后保存设备到好友
     private fun saveDeviceToFriendly(device: Device) {
         if (!savedFriends.any { it.id == device.id }) {

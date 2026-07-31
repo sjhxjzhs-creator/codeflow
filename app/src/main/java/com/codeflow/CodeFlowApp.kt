@@ -2,6 +2,7 @@ package com.codeflow
 
 import android.app.Application
 import com.codeflow.transfer.ConnectionManager
+import com.codeflow.transfer.GroupManager
 
 class CodeFlowApp : Application() {
 
@@ -20,6 +21,10 @@ class CodeFlowApp : Application() {
 
     val connectionManager: ConnectionManager by lazy {
         ConnectionManager(this)
+    }
+
+    val groupManager: GroupManager by lazy {
+        GroupManager(this)
     }
 
     override fun onCreate() {

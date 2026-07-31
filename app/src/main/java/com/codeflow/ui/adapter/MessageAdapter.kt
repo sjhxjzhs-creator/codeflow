@@ -22,6 +22,9 @@ class MessageAdapter(
     private val messages = mutableListOf<Message>()
     private val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
+    // 群聊模式：显示发送者昵称
+    var groupMode = false
+
     fun submitList(newMessages: List<Message>) {
         messages.clear()
         messages.addAll(newMessages)
@@ -78,7 +81,14 @@ class MessageAdapter(
         private fun bindTextMessage(message: Message) {
             binding.layoutText.visibility = View.VISIBLE
             binding.layoutFile.visibility = View.GONE
-            binding.tvSenderName.visibility = View.GONE
+
+            if (groupMode && !message.isFromMe) {
+                binding.tvSenderName.visibility = View.VISIBLE
+                binding.tvSenderName.text = message.senderName ?: "成员"
+            } else {
+                binding.tvSenderName.visibility = View.GONE
+            }
+
             binding.tvContent.text = message.content
             binding.tvTime.text = dateFormat.format(Date(message.timestamp))
 
@@ -114,6 +124,13 @@ class MessageAdapter(
             binding.layoutFile.visibility = View.VISIBLE
             binding.tvFileName.text = message.fileName ?: "Unknown"
             binding.tvFileSize.text = formatFileSize(message.fileSize)
+
+            if (groupMode && !message.isFromMe) {
+                binding.tvSenderName.visibility = View.VISIBLE
+                binding.tvSenderName.text = message.senderName ?: "成员"
+            } else {
+                binding.tvSenderName.visibility = View.GONE
+            }
 
             val iconRes = when {
                 message.fileName?.let { isImageFile(it) } == true -> R.drawable.ic_file_image
