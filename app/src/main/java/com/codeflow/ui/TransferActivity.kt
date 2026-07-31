@@ -1,6 +1,7 @@
 package com.codeflow.ui
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -9,6 +10,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.codeflow.R
@@ -20,6 +22,9 @@ import com.codeflow.transfer.ConnectionManager
 import com.codeflow.transfer.TransferProtocol
 import com.codeflow.transfer.TransferService
 import com.codeflow.ui.adapter.MessageAdapter
+import com.codeflow.util.VoicePlayer
+import com.codeflow.util.VoiceRecorder
+import com.codeflow.util.VoiceUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.collectLatest
@@ -32,6 +37,7 @@ class TransferActivity : AppCompatActivity() {
     private lateinit var binding: ActivityTransferBinding
     private lateinit var connectionManager: ConnectionManager
     private lateinit var messageAdapter: MessageAdapter
+    private var isRecording = false
 
     private val pickFileLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -56,11 +62,18 @@ class TransferActivity : AppCompatActivity() {
             showDisconnectDialog()
         }
 
-        messageAdapter = MessageAdapter { message ->
-            if (message.status == MessageStatus.RECEIVED && message.filePath != null) {
-                openFile(message.filePath)
+        messageAdapter = MessageAdapter(
+            onFileClick = { message ->
+                if (message.status == MessageStatus.RECEIVED && message.filePath != null) {
+                    openFile(message.filePath)
+                }
+            },
+            onVoiceClick = { message ->
+                if (message.filePath != null) {
+                    toggleVoicePlayback(message)
+                }
             }
-        }
+        )
 
         binding.rvMessages.apply {
             layoutManager = LinearLayoutManager(this@TransferActivity).apply {
@@ -79,6 +92,10 @@ class TransferActivity : AppCompatActivity() {
 
         binding.btnAttach.setOnClickListener {
             pickFileLauncher.launch("*/*")
+        }
+
+        binding.btnMic.setOnClickListener {
+            toggleRecording()
         }
 
         binding.btnSend.setOnClickListener {
@@ -118,14 +135,16 @@ class TransferActivity : AppCompatActivity() {
 
         connectionManager.onFileInfoReceived = { fileInfo ->
             runOnUiThread {
+                val isVoice = VoiceUtils.isVoiceFile(fileInfo.fileName)
                 val previewMsg = Message(
                     id = fileInfo.messageId,
-                    type = MessageType.FILE,
+                    type = if (isVoice) MessageType.VOICE else MessageType.FILE,
                     content = fileInfo.fileName,
                     fileName = fileInfo.fileName,
                     fileSize = fileInfo.fileSize,
                     isFromMe = false,
-                    status = MessageStatus.RECEIVING
+                    status = MessageStatus.RECEIVING,
+                    duration = 0
                 )
                 messageAdapter.addMessage(previewMsg)
             }
@@ -145,8 +164,14 @@ class TransferActivity : AppCompatActivity() {
 
         connectionManager.onFileCompleted = { messageId, filePath, _ ->
             runOnUiThread {
-                messageAdapter.updateMessage(messageId, MessageStatus.RECEIVED, 100)
-                messageAdapter.updateMessageFile(messageId, filePath)
+                if (messageAdapter.isVoiceMessage(messageId)) {
+                    messageAdapter.setVoiceDuration(
+                        messageId, filePath, VoiceUtils.getDurationSeconds(filePath)
+                    )
+                } else {
+                    messageAdapter.updateMessage(messageId, MessageStatus.RECEIVED, 100)
+                    messageAdapter.updateMessageFile(messageId, filePath)
+                }
                 Toast.makeText(this, "文件接收完成", Toast.LENGTH_SHORT).show()
             }
         }
@@ -230,6 +255,97 @@ class TransferActivity : AppCompatActivity() {
         }
     }
 
+    private fun toggleVoicePlayback(message: Message) {
+        val path = message.filePath ?: return
+        if (VoicePlayer.isPlaying(path)) {
+            VoicePlayer.stop()
+            messageAdapter.setPlayingMessage(null)
+            return
+        }
+        VoicePlayer.play(path) {
+            runOnUiThread { messageAdapter.setPlayingMessage(null) }
+        }
+        messageAdapter.setPlayingMessage(message.id)
+    }
+
+    private fun toggleRecording() {
+        if (isRecording) {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private fun startRecording() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1001)
+            return
+        }
+        val file = VoiceRecorder.start(this)
+        isRecording = true
+        binding.btnMic.iconTint = ContextCompat.getColorStateList(
+            this, R.color.error
+        )
+        Toast.makeText(this, "正在录音，点击完成", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopRecording() {
+        val result = VoiceRecorder.stop()
+        isRecording = false
+        binding.btnMic.iconTint = ContextCompat.getColorStateList(
+            this, R.color.primary
+        )
+        if (result == null) {
+            Toast.makeText(this, "录音时间太短", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val (file, duration) = result
+        sendVoice(file, duration)
+    }
+
+    private fun sendVoice(file: java.io.File, duration: Int) {
+        try {
+            val messageId = java.util.UUID.randomUUID().toString()
+            val fileInfo = TransferProtocol.FileInfo(
+                messageId = messageId,
+                fileName = file.name,
+                fileSize = file.length(),
+                fileType = "m4a",
+                timestamp = System.currentTimeMillis()
+            )
+            val message = Message(
+                id = messageId,
+                type = MessageType.VOICE,
+                content = file.name,
+                fileName = file.name,
+                fileSize = file.length(),
+                filePath = file.absolutePath,
+                isFromMe = true,
+                status = MessageStatus.SENDING,
+                duration = duration
+            )
+            messageAdapter.addMessage(message)
+            scrollToBottom()
+
+            val inputStream = java.io.FileInputStream(file)
+            connectionManager.sendLargeFile(fileInfo, inputStream, file.length())
+
+            connectionManager.onFileSendProgress = { msgId, progress ->
+                runOnUiThread {
+                    if (msgId == messageId) {
+                        messageAdapter.updateMessage(msgId, MessageStatus.SENDING, progress)
+                        if (progress >= 100) {
+                            messageAdapter.updateMessage(msgId, MessageStatus.SENT, 100)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "语音发送失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun showDisconnectDialog() {
         val view = layoutInflater.inflate(R.layout.dialog_confirm, null)
         view.findViewById<TextView>(R.id.tvTitle).text = getString(R.string.disconnect)
@@ -280,5 +396,23 @@ class TransferActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
         showDisconnectDialog()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && grantResults.isNotEmpty()
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startRecording()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isRecording) {
+            VoiceRecorder.stop()
+        }
+        VoicePlayer.stop()
     }
 }

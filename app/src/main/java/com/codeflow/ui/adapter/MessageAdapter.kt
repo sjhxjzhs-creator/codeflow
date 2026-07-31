@@ -16,7 +16,8 @@ import java.util.Date
 import java.util.Locale
 
 class MessageAdapter(
-    private val onFileClick: (Message) -> Unit
+    private val onFileClick: (Message) -> Unit,
+    private val onVoiceClick: (Message) -> Unit = { }
 ) : RecyclerView.Adapter<MessageAdapter.ViewHolder>() {
 
     private val messages = mutableListOf<Message>()
@@ -24,6 +25,24 @@ class MessageAdapter(
 
     // 群聊模式：显示发送者昵称
     var groupMode = false
+
+    // 当前正在播放的语音消息 id（用于切换播放/暂停图标）
+    private var playingMessageId: String? = null
+
+    fun setPlayingMessage(messageId: String?) {
+        val prev = playingMessageId
+        playingMessageId = messageId
+        if (prev != null) {
+            val idx = messages.indexOfFirst { it.id == prev }
+            if (idx >= 0) notifyItemChanged(idx)
+        }
+        if (messageId != null) {
+            val idx = messages.indexOfFirst { it.id == messageId }
+            if (idx >= 0) notifyItemChanged(idx)
+        }
+    }
+
+    fun isPlaying(messageId: String): Boolean = messageId == playingMessageId
 
     fun submitList(newMessages: List<Message>) {
         messages.clear()
@@ -53,6 +72,22 @@ class MessageAdapter(
         }
     }
 
+    fun isVoiceMessage(messageId: String): Boolean {
+        return messages.firstOrNull { it.id == messageId }?.type == MessageType.VOICE
+    }
+
+    fun setVoiceDuration(messageId: String, filePath: String, duration: Int) {
+        val index = messages.indexOfFirst { it.id == messageId }
+        if (index >= 0 && messages[index].type == MessageType.VOICE) {
+            messages[index] = messages[index].copy(
+                status = MessageStatus.RECEIVED,
+                filePath = filePath,
+                duration = duration
+            )
+            notifyItemChanged(index)
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemMessageBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
@@ -73,6 +108,7 @@ class MessageAdapter(
             when (message.type) {
                 MessageType.TEXT -> bindTextMessage(message)
                 MessageType.IMAGE, MessageType.FILE -> bindFileMessage(message)
+                MessageType.VOICE -> bindVoiceMessage(message)
                 MessageType.SYSTEM -> bindSystemMessage(message)
                 else -> bindSystemMessage(message)
             }
@@ -170,6 +206,48 @@ class MessageAdapter(
             binding.layoutFile.setOnClickListener {
                 if (message.status == MessageStatus.RECEIVED || message.status == MessageStatus.SENT) {
                     onFileClick(message)
+                }
+            }
+        }
+
+        private fun bindVoiceMessage(message: Message) {
+            binding.layoutText.visibility = View.GONE
+            binding.layoutFile.visibility = View.GONE
+            binding.layoutVoice.visibility = View.VISIBLE
+
+            if (groupMode && !message.isFromMe) {
+                binding.tvVoiceSenderName.visibility = View.VISIBLE
+                binding.tvVoiceSenderName.text = message.senderName ?: "成员"
+            } else {
+                binding.tvVoiceSenderName.visibility = View.GONE
+            }
+
+            binding.ivVoiceIcon.setImageResource(
+                if (message.id == playingMessageId) R.drawable.ic_voice_pause
+                else R.drawable.ic_voice_play
+            )
+            binding.tvVoiceDuration.text = "${message.duration}″"
+            binding.tvVoiceTime.text = dateFormat.format(Date(message.timestamp))
+
+            val voiceParams = binding.layoutVoice.layoutParams as FrameLayout.LayoutParams
+            if (message.isFromMe) {
+                voiceParams.gravity = Gravity.END
+                binding.layoutVoice.setBackgroundResource(0)
+                binding.layoutVoice.background = roundedRect(
+                    binding.root.context.getColor(R.color.bubble_sent), 18f
+                )
+            } else {
+                voiceParams.gravity = Gravity.START
+                binding.layoutVoice.setBackgroundResource(0)
+                binding.layoutVoice.background = roundedRect(
+                    binding.root.context.getColor(R.color.bubble_received), 18f
+                )
+            }
+            binding.layoutVoice.layoutParams = voiceParams
+
+            binding.layoutVoice.setOnClickListener {
+                if (message.status == MessageStatus.RECEIVED || message.status == MessageStatus.SENT) {
+                    onVoiceClick(message)
                 }
             }
         }

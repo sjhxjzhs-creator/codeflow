@@ -1,6 +1,7 @@
 package com.codeflow.ui
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
@@ -8,6 +9,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.codeflow.CodeFlowApp
 import com.codeflow.R
@@ -19,6 +21,9 @@ import com.codeflow.model.MessageStatus
 import com.codeflow.model.MessageType
 import com.codeflow.transfer.GroupManager
 import com.codeflow.ui.adapter.MessageAdapter
+import com.codeflow.util.VoicePlayer
+import com.codeflow.util.VoiceRecorder
+import com.codeflow.util.VoiceUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
@@ -30,6 +35,7 @@ class GroupChatActivity : AppCompatActivity() {
     private lateinit var binding: ActivityGroupChatBinding
     private lateinit var groupSession: GroupSession
     private lateinit var messageAdapter: MessageAdapter
+    private var isRecording = false
     private val groupManager: GroupManager by lazy { (application as CodeFlowApp).groupManager }
     private val gson = Gson()
     private var memberList: List<GroupMember> = emptyList()
@@ -57,7 +63,10 @@ class GroupChatActivity : AppCompatActivity() {
         binding.toolbar.title = groupSession.groupName
         binding.toolbar.setNavigationOnClickListener { confirmLeave() }
 
-        messageAdapter = MessageAdapter { msg -> openReceivedFile(msg) }
+        messageAdapter = MessageAdapter(
+            onFileClick = { msg -> openReceivedFile(msg) },
+            onVoiceClick = { msg -> toggleVoicePlayback(msg) }
+        )
         messageAdapter.groupMode = true
 
         binding.rvMessages.apply {
@@ -67,6 +76,7 @@ class GroupChatActivity : AppCompatActivity() {
 
         binding.btnSend.setOnClickListener { sendText() }
         binding.btnAttach.setOnClickListener { pickFile() }
+        binding.btnMic.setOnClickListener { toggleRecording() }
 
         // 成员按钮：点击工具栏？加一个 menu。这里先通过长按标题或添加 action。
         setupCallbacks()
@@ -98,14 +108,19 @@ class GroupChatActivity : AppCompatActivity() {
             if (header.senderId != groupSession.myMemberId) {
                 val key = "F_${header.senderId}_${header.timestamp}"
                 if (seenMessageIds.add(key)) {
+                    val isVoice = VoiceUtils.isVoiceFile(header.fileName)
                     messageAdapter.addMessage(
                         Message(
                             id = "${header.timestamp}_${header.senderId}",
-                            type = if (header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
-                                || header.fileName.lowercase(Locale.ROOT).endsWith("png")
-                                || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
-                                || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
-                            ) MessageType.IMAGE else MessageType.FILE,
+                            type = when {
+                                isVoice -> MessageType.VOICE
+                                header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
+                                    || header.fileName.lowercase(Locale.ROOT).endsWith("png")
+                                    || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
+                                    || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
+                                -> MessageType.IMAGE
+                                else -> MessageType.FILE
+                            },
                             content = "",
                             fileName = header.fileName,
                             fileSize = header.fileSize,
@@ -113,11 +128,12 @@ class GroupChatActivity : AppCompatActivity() {
                             isFromMe = false,
                             status = MessageStatus.RECEIVED,
                             timestamp = header.timestamp,
-                            senderName = header.senderName
+                            senderName = header.senderName,
+                            duration = if (isVoice) VoiceUtils.getDurationSeconds(file.absolutePath) else 0
                         )
                     )
                     scrollToBottom()
-                    Toast.makeText(this, "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, if (isVoice) "收到语音" else "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -216,6 +232,76 @@ class GroupChatActivity : AppCompatActivity() {
         }
     }
 
+    private fun toggleVoicePlayback(message: Message) {
+        val path = message.filePath ?: return
+        if (VoicePlayer.isPlaying(path)) {
+            VoicePlayer.stop()
+            messageAdapter.setPlayingMessage(null)
+            return
+        }
+        VoicePlayer.play(path) {
+            runOnUiThread { messageAdapter.setPlayingMessage(null) }
+        }
+        messageAdapter.setPlayingMessage(message.id)
+    }
+
+    private fun toggleRecording() {
+        if (isRecording) stopRecording() else startRecording()
+    }
+
+    private fun startRecording() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 1001)
+            return
+        }
+        VoiceRecorder.start(this)
+        isRecording = true
+        binding.btnMic.iconTint = ContextCompat.getColorStateList(this, R.color.error)
+        Toast.makeText(this, "正在录音，点击完成", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopRecording() {
+        val result = VoiceRecorder.stop()
+        isRecording = false
+        binding.btnMic.iconTint = ContextCompat.getColorStateList(this, R.color.primary)
+        if (result == null) {
+            Toast.makeText(this, "录音时间太短", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val (file, duration) = result
+        sendGroupVoice(file, duration)
+    }
+
+    private fun sendGroupVoice(file: java.io.File, duration: Int) {
+        if (file.length() > GroupManager.MAX_GROUP_FILE_SIZE) {
+            Toast.makeText(this, "语音文件过大", Toast.LENGTH_LONG).show()
+            return
+        }
+        val result = groupManager.sendFile(file)
+        if (result.isSuccess) {
+            messageAdapter.addMessage(
+                Message(
+                    type = MessageType.VOICE,
+                    content = "",
+                    fileName = file.name,
+                    fileSize = file.length(),
+                    filePath = file.absolutePath,
+                    isFromMe = true,
+                    status = MessageStatus.SENT,
+                    timestamp = System.currentTimeMillis(),
+                    senderName = groupSession.myNickname,
+                    duration = duration
+                )
+            )
+            scrollToBottom()
+        } else {
+            Toast.makeText(
+                this, result.exceptionOrNull()?.message ?: "发送失败", Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private fun getFileFromUri(uri: Uri): File? {
         return try {
             val resolver = contentResolver
@@ -306,6 +392,24 @@ class GroupChatActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
         confirmLeave()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1001 && grantResults.isNotEmpty()
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startRecording()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isRecording) {
+            VoiceRecorder.stop()
+        }
+        VoicePlayer.stop()
     }
 
     override fun onSaveInstanceState(outState: android.os.Bundle) {

@@ -8,6 +8,7 @@ enum class MessageType {
     TEXT,
     IMAGE,
     FILE,
+    VOICE,
     SYSTEM
 }
 
@@ -31,5 +32,6 @@ data class Message(
     val status: MessageStatus = MessageStatus.SENDING,
     val timestamp: Long = System.currentTimeMillis(),
     val progress: Int = 0,
-    val senderName: String? = null
+    val senderName: String? = null,
+    val duration: Int = 0
 ) : Parcelable

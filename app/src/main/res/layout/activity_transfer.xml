@@ -13,6 +13,7 @@
         android:background="@color/primary"
         android:elevation="4dp"
         app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationIconTint="@android:color/white"
         app:title="@string/transfer_title"
         app:titleTextColor="@android:color/white" />
 
@@ -102,6 +103,15 @@
                 android:hint="@string/type_message" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnMic"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:icon="@drawable/ic_mic"
+            app:iconTint="@color/primary"
+            android:contentDescription="录音" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSend"
