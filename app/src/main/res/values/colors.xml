@@ -12,4 +12,6 @@
     <color name="connected_bg">#E8F5E9</color>
     <color name="tag_bluetooth">#1565C0</color>
     <color name="tag_wifi">#2E7D32</color>
+    <color name="status_online">#2E7D32</color>
+    <color name="status_offline">#9E9E9E</color>
 </resources>

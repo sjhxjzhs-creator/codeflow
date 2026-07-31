@@ -24,6 +24,7 @@ import com.codeflow.databinding.DialogConnectionRequestBinding
 import com.codeflow.databinding.DialogFormBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
+import com.codeflow.model.DeviceStatus
 import com.codeflow.model.Group
 import com.codeflow.model.GroupSession
 import com.codeflow.transfer.ConnectionManager
@@ -53,6 +54,7 @@ class DeviceListActivity : AppCompatActivity() {
     private var isConnecting = false
     private var pendingDeviceForFriend: Device? = null
     private var savedFriends = mutableListOf<Device>()
+    private val discoveredDeviceIds = mutableSetOf<String>()
     
     // 当前模式
     private enum class Mode {
@@ -228,8 +230,23 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun showFriendsView() {
-        deviceAdapter.submitList(savedFriends)
+        refreshFriendsStatus()
         updateEmptyView(savedFriends.isEmpty(), "暂无好友\n连接过的设备会自动保存到好友列表")
+    }
+
+    private fun refreshFriendsStatus() {
+        if (currentMode != Mode.FRIENDS) return
+        val onlineIds = discoveredDeviceIds
+        val updated = savedFriends.map { f ->
+            val shouldBeOnline = onlineIds.contains(f.id)
+            if (shouldBeOnline) {
+                if (f.status == DeviceStatus.ONLINE) f else f.copy(status = DeviceStatus.ONLINE)
+            } else {
+                if (f.status == DeviceStatus.OFFLINE) f else f.copy(status = DeviceStatus.OFFLINE)
+            }
+        }.toMutableList()
+        savedFriends = updated
+        deviceAdapter.submitList(savedFriends)
     }
     
     private fun showChatRoomsView() {
@@ -254,17 +271,23 @@ class DeviceListActivity : AppCompatActivity() {
         lifecycleScope.launch {
             launch {
                 connectionManager.getBluetoothDevices().collectLatest { devices ->
+                    discoveredDeviceIds.addAll(devices.map { it.id })
                     if (currentMode == Mode.BLUETOOTH) {
                         deviceAdapter.submitList(devices)
                         updateEmptyView(devices.isEmpty(), "未发现蓝牙设备")
+                    } else if (currentMode == Mode.FRIENDS) {
+                        refreshFriendsStatus()
                     }
                 }
             }
             launch {
                 connectionManager.getNetworkDevices().collectLatest { devices ->
+                    discoveredDeviceIds.addAll(devices.map { it.id })
                     if (currentMode == Mode.WIFI) {
                         deviceAdapter.submitList(devices)
                         updateEmptyView(devices.isEmpty(), "未发现局域网设备")
+                    } else if (currentMode == Mode.FRIENDS) {
+                        refreshFriendsStatus()
                     }
                 }
             }

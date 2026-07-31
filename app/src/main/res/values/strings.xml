@@ -9,6 +9,8 @@
     <string name="connect">连接</string>
     <string name="transfer_title">传输</string>
     <string name="disconnect">断开</string>
+    <string name="cancel">取消</string>
+    <string name="ok">确定</string>
     <string name="attach_file">添加文件</string>
     <string name="type_message">输入消息...</string>
     <string name="send">发送</string>

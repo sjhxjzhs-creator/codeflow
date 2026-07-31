@@ -32,6 +32,7 @@ class ConnectionManager(context: Context) {
     var onMessageReceived: ((Message) -> Unit)? = null
     var onFileInfoReceived: ((TransferProtocol.FileInfo) -> Unit)? = null
     var onFileCompleted: ((String, String, Long) -> Unit)? = null
+    var onPeerDisconnected: (() -> Unit)? = null
     var onFileSendProgress: ((String, Int) -> Unit)? = null
     var onFileReceiveProgress: ((String, Int) -> Unit)? = null
     var onConnectionRequest: ((String, String) -> Unit)? = null
@@ -214,8 +215,7 @@ class ConnectionManager(context: Context) {
                     val result = TransferProtocol.readPacket(input)
                     if (result == null) {
                         if (!isActive) return@launch
-                        delay(100)
-                        continue
+                        throw IOException("Peer closed connection")
                     }
                     val (type, payload) = result
 
@@ -228,6 +228,7 @@ class ConnectionManager(context: Context) {
             } catch (e: IOException) {
                 if (isActive) {
                     withContext(Dispatchers.Main) {
+                        onPeerDisconnected?.invoke()
                         _connectionState.value = ConnectionState.DISCONNECTED
                     }
                 }

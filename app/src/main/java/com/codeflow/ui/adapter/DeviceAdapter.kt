@@ -7,6 +7,7 @@ import com.codeflow.R
 import com.codeflow.databinding.ItemDeviceBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
+import com.codeflow.model.DeviceStatus
 
 class DeviceAdapter(
     private val onDeviceClick: (Device) -> Unit
@@ -42,10 +43,11 @@ class DeviceAdapter(
                 ConnectionType.BLUETOOTH -> device.bluetoothAddress ?: binding.root.context.getString(R.string.device_info_bt)
                 ConnectionType.WIFI -> "${device.ipAddress}:${device.port}" ?: binding.root.context.getString(R.string.device_info_wifi)
             }
-            binding.tvConnectionType.text = when (device.connectionType) {
-                ConnectionType.BLUETOOTH -> binding.root.context.getString(R.string.connection_type_bluetooth)
-                ConnectionType.WIFI -> binding.root.context.getString(R.string.connection_type_wifi)
-            }
+            val online = device.status == DeviceStatus.ONLINE || device.status == DeviceStatus.CONNECTING
+            binding.tvConnectionType.text = if (online) "在线" else "离线"
+            binding.tvConnectionType.setBackgroundResource(
+                if (online) R.drawable.bg_status_online else R.drawable.bg_status_offline
+            )
             binding.ivDeviceIcon.setImageResource(
                 when (device.connectionType) {
                     ConnectionType.BLUETOOTH -> R.drawable.ic_bluetooth

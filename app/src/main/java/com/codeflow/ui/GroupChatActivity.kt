@@ -4,12 +4,13 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.codeflow.CodeFlowApp
+import com.codeflow.R
 import com.codeflow.databinding.ActivityGroupChatBinding
 import com.codeflow.model.GroupMember
 import com.codeflow.model.GroupSession
@@ -18,6 +19,8 @@ import com.codeflow.model.MessageStatus
 import com.codeflow.model.MessageType
 import com.codeflow.transfer.GroupManager
 import com.codeflow.ui.adapter.MessageAdapter
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
 import java.io.File
 import java.util.Locale
@@ -30,6 +33,8 @@ class GroupChatActivity : AppCompatActivity() {
     private val groupManager: GroupManager by lazy { (application as CodeFlowApp).groupManager }
     private val gson = Gson()
     private var memberList: List<GroupMember> = emptyList()
+    private var previousMembers: List<GroupMember>? = null
+    private val seenMessageIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private val filePicker = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -72,47 +77,63 @@ class GroupChatActivity : AppCompatActivity() {
     private fun setupCallbacks() {
         groupManager.onMessageReceived = { msg ->
             if (msg.senderId != groupSession.myMemberId) {
-                messageAdapter.addMessage(
-                    Message(
-                        id = "${msg.timestamp}_${msg.senderId}",
-                        type = MessageType.TEXT,
-                        content = msg.content,
-                        isFromMe = false,
-                        status = MessageStatus.RECEIVED,
-                        timestamp = msg.timestamp,
-                        senderName = msg.senderName
+                val key = "${msg.senderId}_${msg.timestamp}"
+                if (seenMessageIds.add(key)) {
+                    messageAdapter.addMessage(
+                        Message(
+                            id = "${msg.timestamp}_${msg.senderId}",
+                            type = MessageType.TEXT,
+                            content = msg.content,
+                            isFromMe = false,
+                            status = MessageStatus.RECEIVED,
+                            timestamp = msg.timestamp,
+                            senderName = msg.senderName
+                        )
                     )
-                )
-                scrollToBottom()
+                    scrollToBottom()
+                }
             }
         }
         groupManager.onFileReceived = { header, file ->
             if (header.senderId != groupSession.myMemberId) {
-                messageAdapter.addMessage(
-                    Message(
-                        id = "${header.timestamp}_${header.senderId}",
-                        type = if (header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
-                            || header.fileName.lowercase(Locale.ROOT).endsWith("png")
-                            || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
-                            || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
-                        ) MessageType.IMAGE else MessageType.FILE,
-                        content = "",
-                        fileName = header.fileName,
-                        fileSize = header.fileSize,
-                        filePath = file.absolutePath,
-                        isFromMe = false,
-                        status = MessageStatus.RECEIVED,
-                        timestamp = header.timestamp,
-                        senderName = header.senderName
+                val key = "F_${header.senderId}_${header.timestamp}"
+                if (seenMessageIds.add(key)) {
+                    messageAdapter.addMessage(
+                        Message(
+                            id = "${header.timestamp}_${header.senderId}",
+                            type = if (header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
+                                || header.fileName.lowercase(Locale.ROOT).endsWith("png")
+                                || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
+                                || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
+                            ) MessageType.IMAGE else MessageType.FILE,
+                            content = "",
+                            fileName = header.fileName,
+                            fileSize = header.fileSize,
+                            filePath = file.absolutePath,
+                            isFromMe = false,
+                            status = MessageStatus.RECEIVED,
+                            timestamp = header.timestamp,
+                            senderName = header.senderName
+                        )
                     )
-                )
-                scrollToBottom()
-                Toast.makeText(this, "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
+                    scrollToBottom()
+                    Toast.makeText(this, "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
         groupManager.onMemberChanged = { members ->
-            memberList = members
-            refreshTitle()
+            runOnUiThread {
+                val oldMembers = previousMembers
+                memberList = members
+                previousMembers = members
+                if (oldMembers != null) {
+                    val newIds = members.map { it.id }.toSet()
+                    oldMembers
+                        .filter { it.id !in newIds && it.id != groupSession.myMemberId }
+                        .forEach { addSystemMessage("${it.nickname} 已退出群聊") }
+                }
+                refreshTitle()
+            }
         }
         groupManager.onGroupDisbanded = { _ ->
             runOnUiThread {
@@ -267,15 +288,20 @@ class GroupChatActivity : AppCompatActivity() {
     }
 
     private fun confirmLeave() {
-        AlertDialog.Builder(this)
-            .setTitle("离开群聊")
-            .setMessage(if (groupSession.isHost) "你确定要解散此群聊吗？" else "你确定要退出此群聊吗？")
-            .setPositiveButton("确定") { _, _ ->
-                groupManager.leaveGroup()
-                finish()
-            }
-            .setNegativeButton("取消", null)
+        val view = layoutInflater.inflate(R.layout.dialog_confirm, null)
+        view.findViewById<TextView>(R.id.tvTitle).text = "离开群聊"
+        view.findViewById<TextView>(R.id.tvMessage).text =
+            if (groupSession.isHost) "你确定要解散此群聊吗？" else "你确定要退出此群聊吗？"
+        val btnConfirm = view.findViewById<MaterialButton>(R.id.btnConfirm)
+        btnConfirm.text = if (groupSession.isHost) "解散" else "退出"
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(view)
             .show()
+        view.findViewById<MaterialButton>(R.id.btnCancel).setOnClickListener { dialog.dismiss() }
+        btnConfirm.setOnClickListener {
+            groupManager.leaveGroup()
+            finish()
+        }
     }
 
     override fun onBackPressed() {

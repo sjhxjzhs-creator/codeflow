@@ -5,9 +5,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +20,8 @@ import com.codeflow.transfer.ConnectionManager
 import com.codeflow.transfer.TransferProtocol
 import com.codeflow.transfer.TransferService
 import com.codeflow.ui.adapter.MessageAdapter
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
@@ -97,6 +99,19 @@ class TransferActivity : AppCompatActivity() {
         connectionManager.onMessageReceived = { message ->
             runOnUiThread {
                 messageAdapter.addMessage(message)
+                scrollToBottom()
+            }
+        }
+
+        connectionManager.onPeerDisconnected = {
+            runOnUiThread {
+                messageAdapter.addMessage(
+                    Message(
+                        type = MessageType.SYSTEM,
+                        content = "对方已退出",
+                        isFromMe = false
+                    )
+                )
                 scrollToBottom()
             }
         }
@@ -216,15 +231,18 @@ class TransferActivity : AppCompatActivity() {
     }
 
     private fun showDisconnectDialog() {
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.disconnect))
-            .setMessage("确定要断开连接吗？")
-            .setPositiveButton(getString(R.string.disconnect)) { _, _ ->
-                connectionManager.disconnect()
-                finish()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
+        val view = layoutInflater.inflate(R.layout.dialog_confirm, null)
+        view.findViewById<TextView>(R.id.tvTitle).text = getString(R.string.disconnect)
+        view.findViewById<TextView>(R.id.tvMessage).text = "确定要断开连接吗？"
+        view.findViewById<MaterialButton>(R.id.btnConfirm).text = getString(R.string.disconnect)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(view)
             .show()
+        view.findViewById<MaterialButton>(R.id.btnCancel).setOnClickListener { dialog.dismiss() }
+        view.findViewById<MaterialButton>(R.id.btnConfirm).setOnClickListener {
+            connectionManager.disconnect()
+            finish()
+        }
     }
 
     private fun scrollToBottom() {
