@@ -582,7 +582,7 @@ class DeviceListActivity : AppCompatActivity() {
             confirmText = "加入",
             fields = listOf(
                 "你的昵称" to android.text.InputType.TYPE_CLASS_TEXT,
-                "输入 IP:端口（如 192.168.1.5:53319）" to android.text.InputType.TYPE_CLASS_TEXT,
+                "输入 IP:端口（房主IP地址:53319）" to android.text.InputType.TYPE_CLASS_TEXT,
                 "入群密码（如有）" to
                     (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
             )
