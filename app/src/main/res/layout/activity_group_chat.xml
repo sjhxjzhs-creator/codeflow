@@ -31,7 +31,7 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:gravity="center_vertical"
-        android:background="@color/surface"
+        android:background="@drawable/bg_bottom_sheet_glass"
         android:elevation="8dp">
 
         <com.google.android.material.button.MaterialButton

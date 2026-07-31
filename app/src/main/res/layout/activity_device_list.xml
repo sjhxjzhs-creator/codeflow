@@ -49,7 +49,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="16dp"
-        android:background="@color/surface"
+        android:background="@drawable/bg_bottom_sheet_glass"
         android:gravity="center"
         android:visibility="gone">
 

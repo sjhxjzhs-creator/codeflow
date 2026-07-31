@@ -7,6 +7,9 @@
     <color name="surface">#FFFFFF</color>
     <color name="surface_variant">#FAFAFA</color>
     <color name="divider">#22000000</color>
+    <color name="glass_surface">#CCFFFFFF</color>
+    <color name="glass_highlight">#40FFFFFF</color>
+    <color name="glass_stroke">#1FFFFFFF</color>
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
     <color name="text_on_primary">#FFFFFF</color>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 磨砂玻璃卡片：半透明圆角主体 + 顶部高光，配合 MaterialCardView 圆角裁切 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:bottom="-1dp" android:left="-1dp" android:right="-1dp" android:top="-1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/glass_surface" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/glass_stroke" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+</layer-list>
