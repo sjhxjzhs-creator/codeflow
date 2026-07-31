@@ -21,9 +21,7 @@ import com.codeflow.R
 import com.codeflow.databinding.ActivityDeviceListBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
-import com.codeflow.model.Group
 import com.codeflow.transfer.ConnectionManager
-import com.codeflow.transfer.GroupManager
 import com.codeflow.ui.adapter.DeviceAdapter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -35,24 +33,12 @@ class DeviceListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDeviceListBinding
     private lateinit var connectionManager: ConnectionManager
-    private lateinit var groupManager: GroupManager
     private lateinit var prefs: SharedPreferences
     private lateinit var deviceAdapter: DeviceAdapter
     
     private var isConnecting = false
-    private var currentGroup: Group? = null
     private var savedFriends = mutableListOf<Device>()
-    private var availableChatRooms = mutableListOf<ChatRoomInfo>()
     
-    data class ChatRoomInfo(
-        val groupId: String,
-        val groupName: String,
-        val hostName: String,
-        val hostIp: String,
-        val hostPort: Int,
-        val memberCount: Int
-    )
-
     // 当前模式
     private enum class Mode {
         BLUETOOTH, WIFI, FRIENDS, CHAT_ROOMS
@@ -85,10 +71,8 @@ class DeviceListActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("bchat_prefs", Context.MODE_PRIVATE)
         loadSavedFriends()
-        loadChatRooms()
 
         connectionManager = (application as CodeFlowApp).connectionManager
-        groupManager = GroupManager(this)
         
         setupDeviceInfo()
         setupUI()
@@ -152,6 +136,19 @@ class DeviceListActivity : AppCompatActivity() {
         binding.chipChatRooms.setOnClickListener { setMode(Mode.CHAT_ROOMS) }
     }
     
+    private fun loadSavedFriends() {
+        val friendsJson = prefs.getString("saved_friends", null)
+        if (friendsJson != null) {
+            val type = object : TypeToken<List<Device>>() {}.type
+            savedFriends = Gson().fromJson(friendsJson, type) ?: mutableListOf()
+        }
+    }
+    
+    private fun saveFriends() {
+        val json = Gson().toJson(savedFriends)
+        prefs.edit().putString("saved_friends", json).apply()
+    }
+
     private fun setMode(mode: Mode) {
         currentMode = mode
         
@@ -190,19 +187,8 @@ class DeviceListActivity : AppCompatActivity() {
     }
     
     private fun showChatRoomsView() {
-        val chatRoomDevices = availableChatRooms.map { chatRoom ->
-            Device(
-                id = chatRoom.groupId,
-                name = "${chatRoom.groupName} (${chatRoom.hostName})",
-                connectionType = ConnectionType.WIFI,
-                ipAddress = chatRoom.hostIp,
-                port = chatRoom.hostPort,
-                status = com.codeflow.model.DeviceStatus.ONLINE
-            )
-        }
-        
-        deviceAdapter.submitList(chatRoomDevices)
-        updateEmptyView(chatRoomDevices.isEmpty(), "暂无聊天室\n好友发起的群聊会显示在这里")
+        deviceAdapter.submitList(emptyList())
+        updateEmptyView(true, "聊天室功能开发中")
     }
 
     private fun observeState() {
@@ -329,132 +315,19 @@ class DeviceListActivity : AppCompatActivity() {
     }
     
     private fun showCreateGroupDialog() {
-        // 创建群聊
-        lifecycleScope.launch {
-            currentGroup = groupManager.createGroup()
-            currentGroup?.let { group ->
-                val connectionInfo = groupManager.getGroupConnectionInfo() ?: return@let
-                
-                // 保存到聊天室列表
-                val ipMatch = try {
-                    connectionInfo.substringAfter("\"ip\":").substringAfter("\"").substringBefore("\"")
-                } catch (e: Exception) { "" }
-                val portMatch = try {
-                    connectionInfo.substringAfter("\"port\":").substringBefore(",").trim().toIntOrNull() ?: 53318
-                } catch (e: Exception) { 53318 }
-                
-                availableChatRooms.add(ChatRoomInfo(
-                    groupId = group.groupId,
-                    groupName = group.groupName,
-                    hostName = group.hostName,
-                    hostIp = ipMatch,
-                    hostPort = portMatch,
-                    memberCount = group.memberCount
-                ))
-                saveChatRooms()
-                
-                // 复制到剪贴板
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("group_info", connectionInfo))
-                
-                AlertDialog.Builder(this@DeviceListActivity)
-                    .setTitle("群聊已创建")
-                    .setMessage("已复制群聊信息到剪贴板，分享给好友邀请他们加入。")
-                    .setPositiveButton("分享") { _, _ ->
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, connectionInfo)
-                        }
-                        startActivity(Intent.createChooser(shareIntent, "分享群聊"))
-                    }
-                    .setNeutralButton("进入聊天", { _, _ ->
-                        val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
-                            putExtra(GroupChatActivity.EXTRA_GROUP_ID, group.groupId)
-                            putExtra(GroupChatActivity.EXTRA_IS_HOST, true)
-                        }
-                        startActivity(intent)
-                    })
-                    .setNegativeButton("取消", null)
-                    .show()
-            } ?: run {
-                Toast.makeText(this@DeviceListActivity, "创建群聊失败", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-    
-    private fun showJoinGroupDialog() {
-        val editTextView = android.widget.EditText(this).apply {
-            hint = "IP:Port (例如：192.168.43.1:53318)"
-            setTextSize(16f)
-            setPadding(50, 40, 50, 10)
-        }
-        
         AlertDialog.Builder(this)
-            .setTitle("加入群聊")
-            .setMessage("请输入群主的 IP 地址和端口：")
-            .setView(editTextView)
-            .setPositiveButton("连接") { _, _ ->
-                val input = editTextView.text?.toString()?.trim() ?: ""
-                val parts = input.split(":")
-                if (parts.size == 2) {
-                    try {
-                        val hostIp = parts[0].trim()
-                        val hostPort = parts[1].trim().toInt()
-                        val groupId = UUID.randomUUID().toString()
-                        
-                        val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
-                            putExtra(GroupChatActivity.EXTRA_GROUP_ID, groupId)
-                            putExtra(GroupChatActivity.EXTRA_IS_HOST, false)
-                            putExtra(GroupChatActivity.EXTRA_HOST_IP, hostIp)
-                            putExtra(GroupChatActivity.EXTRA_HOST_PORT, hostPort)
-                        }
-                        startActivity(intent)
-                    } catch (e: NumberFormatException) {
-                        Toast.makeText(this, "端口号格式错误", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Toast.makeText(this, "请输入有效的 IP:Port", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("取消", null)
+            .setTitle("群聊功能")
+            .setMessage("群聊功能开发中，敬请期待！")
+            .setPositiveButton("好的", null)
             .show()
     }
     
-    // 请求加入聊天室（简化版：直接连接）
-    private fun requestJoinChatRoom(chatRoom: ChatRoomInfo) {
-        val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
-            putExtra(GroupChatActivity.EXTRA_GROUP_ID, chatRoom.groupId)
-            putExtra(GroupChatActivity.EXTRA_IS_HOST, false)
-            putExtra(GroupChatActivity.EXTRA_HOST_IP, chatRoom.hostIp)
-            putExtra(GroupChatActivity.EXTRA_HOST_PORT, chatRoom.hostPort)
-        }
-        startActivity(intent)
-    }
-
-    private fun loadSavedFriends() {
-        val friendsJson = prefs.getString("saved_friends", null)
-        if (friendsJson != null) {
-            val type = object : TypeToken<List<Device>>() {}.type
-            savedFriends = Gson().fromJson(friendsJson, type) ?: mutableListOf()
-        }
-    }
-    
-    private fun saveFriends() {
-        val json = Gson().toJson(savedFriends)
-        prefs.edit().putString("saved_friends", json).apply()
-    }
-    
-    private fun saveChatRooms() {
-        val json = Gson().toJson(availableChatRooms)
-        prefs.edit().putString("saved_chatrooms", json).apply()
-    }
-    
-    private fun loadChatRooms() {
-        val chatRoomsJson = prefs.getString("saved_chatrooms", null)
-        if (chatRoomsJson != null) {
-            val type = object : TypeToken<List<ChatRoomInfo>>() {}.type
-            availableChatRooms = Gson().fromJson(chatRoomsJson, type) ?: mutableListOf()
-        }
+    private fun showJoinGroupDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("群聊功能")
+            .setMessage("群聊功能开发中，敬请期待！")
+            .setPositiveButton("好的", null)
+            .show()
     }
     
     // 连接成功后保存设备到好友
@@ -479,6 +352,6 @@ class DeviceListActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        groupManager.cleanup()
+        connectionManager.cleanup()
     }
 }

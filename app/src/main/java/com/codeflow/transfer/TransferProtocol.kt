@@ -33,13 +33,7 @@ object TransferProtocol {
         FILE_DATA("file_data"),
         FILE_COMPLETE("file_complete"),
         DISCONNECT("disconnect"),
-        DEVICE_INFO("device_info"),
-        // 群聊相关
-        GROUP_JOIN("group_join"),
-        GROUP_LEAVE("group_leave"),
-        GROUP_MESSAGE("group_msg"),
-        GROUP_MEMBER_LIST("group_members"),
-        GROUP_FULL("group_full");
+        DEVICE_INFO("device_info");
 
         companion object {
             fun fromValue(value: String): PacketType? =
@@ -62,11 +56,7 @@ object TransferProtocol {
     data class TextMessage(
         @SerializedName("messageId") val messageId: String,
         @SerializedName("content") val content: String,
-        @SerializedName("timestamp") val timestamp: Long,
-        @SerializedName("senderId") val senderId: String? = null,
-        @SerializedName("senderName") val senderName: String? = null,
-        @SerializedName("groupId") val groupId: String? = null,
-        @SerializedName("isGroupMsg") val isGroupMsg: Boolean = false
+        @SerializedName("timestamp") val timestamp: Long
     )
 
     data class FileInfo(
@@ -74,42 +64,7 @@ object TransferProtocol {
         @SerializedName("fileName") val fileName: String,
         @SerializedName("fileSize") val fileSize: Long,
         @SerializedName("fileType") val fileType: String,
-        @SerializedName("timestamp") val timestamp: Long,
-        @SerializedName("senderId") val senderId: String? = null,
-        @SerializedName("senderName") val senderName: String? = null,
-        @SerializedName("groupId") val groupId: String? = null,
-        @SerializedName("isGroupMsg") val isGroupMsg: Boolean = false
-    )
-
-    data class GroupJoin(
-        @SerializedName("groupId") val groupId: String,
-        @SerializedName("deviceId") val deviceId: String,
-        @SerializedName("deviceName") val deviceName: String,
         @SerializedName("timestamp") val timestamp: Long
-    )
-
-    data class GroupLeave(
-        @SerializedName("groupId") val groupId: String,
-        @SerializedName("deviceId") val deviceId: String,
-        @SerializedName("timestamp") val timestamp: Long
-    )
-
-    data class GroupMemberList(
-        @SerializedName("groupId") val groupId: String,
-        @SerializedName("hostDeviceId") val hostDeviceId: String,
-        @SerializedName("hostName") val hostName: String,
-        @SerializedName("members") val members: List<DeviceDto>
-    )
-
-    data class DeviceDto(
-        @SerializedName("id") val id: String,
-        @SerializedName("name") val name: String,
-        @SerializedName("ipAddress") val ipAddress: String? = null
-    )
-
-    data class GroupFull(
-        @SerializedName("groupId") val groupId: String,
-        @SerializedName("maxMembers") val maxMembers: Int
     )
 
     fun writePacket(output: OutputStream, type: PacketType, payload: Any) {

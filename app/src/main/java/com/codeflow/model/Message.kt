@@ -8,11 +8,7 @@ enum class MessageType {
     TEXT,
     IMAGE,
     FILE,
-    SYSTEM,
-    GROUP_TEXT,
-    GROUP_FILE,
-    GROUP_JOIN,
-    GROUP_LEAVE
+    SYSTEM
 }
 
 enum class MessageStatus {
@@ -34,10 +30,5 @@ data class Message(
     val isFromMe: Boolean,
     val status: MessageStatus = MessageStatus.SENDING,
     val timestamp: Long = System.currentTimeMillis(),
-    val progress: Int = 0,
-    // 群聊相关字段
-    val groupId: String? = null,
-    val senderId: String? = null,
-    val senderName: String? = null,
-    val isGroupMsg: Boolean = false
+    val progress: Int = 0
 ) : Parcelable

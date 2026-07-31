@@ -67,15 +67,11 @@ class MessageAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(message: Message) {
-            when {
-                // 群聊系统消息
-                message.type == MessageType.GROUP_JOIN || message.type == MessageType.GROUP_LEAVE -> bindGroupSystemMessage(message)
-                // 群聊消息
-                message.isGroupMsg -> bindGroupMessage(message)
-                // 私聊消息
-                message.type == MessageType.TEXT -> bindTextMessage(message)
-                message.type == MessageType.IMAGE || message.type == MessageType.FILE -> bindFileMessage(message)
-                message.type == MessageType.SYSTEM -> bindSystemMessage(message)
+            when (message.type) {
+                MessageType.TEXT -> bindTextMessage(message)
+                MessageType.IMAGE, MessageType.FILE -> bindFileMessage(message)
+                MessageType.SYSTEM -> bindSystemMessage(message)
+                else -> bindSystemMessage(message)
             }
         }
 
@@ -111,44 +107,6 @@ class MessageAdapter(
                 binding.tvStatus.visibility = View.GONE
             }
             binding.layoutText.layoutParams = textParams
-        }
-
-        private fun bindGroupMessage(message: Message) {
-            binding.layoutText.visibility = View.VISIBLE
-            binding.layoutFile.visibility = View.GONE
-            binding.tvSenderName.visibility = View.VISIBLE
-            binding.tvSenderName.text = message.senderName ?: "未知成员"
-            binding.tvContent.text = message.content
-            binding.tvTime.text = dateFormat.format(Date(message.timestamp))
-
-            val textParams = binding.layoutText.layoutParams as FrameLayout.LayoutParams
-            textParams.gravity = Gravity.START
-            binding.layoutText.setBackgroundResource(0)
-            binding.layoutText.background = roundedRect(
-                binding.root.context.getColor(R.color.bubble_received), 18f
-            )
-            binding.layoutTextFooter.visibility = View.GONE
-            binding.tvStatus.visibility = View.GONE
-
-            binding.layoutText.layoutParams = textParams
-        }
-
-        private fun bindGroupSystemMessage(message: Message) {
-            binding.layoutText.visibility = View.VISIBLE
-            binding.layoutFile.visibility = View.GONE
-            binding.tvSenderName.visibility = View.GONE
-            binding.tvContent.text = message.content
-            binding.layoutTextFooter.visibility = View.GONE
-
-            val textParams = binding.layoutText.layoutParams as FrameLayout.LayoutParams
-            textParams.gravity = Gravity.CENTER
-            binding.layoutText.layoutParams = textParams
-
-            binding.layoutText.setBackgroundResource(0)
-            binding.layoutText.background = roundedRect(
-                binding.root.context.resources.getColor(android.R.color.darker_gray, null),
-                12f
-            )
         }
 
         private fun bindFileMessage(message: Message) {
