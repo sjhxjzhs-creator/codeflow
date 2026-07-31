@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="transfers" path="transfers/" />
+    <files-path name="group_transfers" path="group_transfers/" />
     <cache-path name="cache" path="/" />
 </paths>

@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.net.toUri
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.codeflow.CodeFlowApp
 import com.codeflow.databinding.ActivityGroupChatBinding
@@ -72,42 +71,44 @@ class GroupChatActivity : AppCompatActivity() {
 
     private fun setupCallbacks() {
         groupManager.onMessageReceived = { msg ->
-            val isMe = msg.senderId == groupSession.myMemberId
-            messageAdapter.addMessage(
-                Message(
-                    id = "${msg.timestamp}_${msg.senderId}",
-                    type = MessageType.TEXT,
-                    content = msg.content,
-                    isFromMe = isMe,
-                    status = if (isMe) MessageStatus.SENT else MessageStatus.RECEIVED,
-                    timestamp = msg.timestamp,
-                    senderName = msg.senderName
+            if (msg.senderId != groupSession.myMemberId) {
+                messageAdapter.addMessage(
+                    Message(
+                        id = "${msg.timestamp}_${msg.senderId}",
+                        type = MessageType.TEXT,
+                        content = msg.content,
+                        isFromMe = false,
+                        status = MessageStatus.RECEIVED,
+                        timestamp = msg.timestamp,
+                        senderName = msg.senderName
+                    )
                 )
-            )
-            scrollToBottom()
+                scrollToBottom()
+            }
         }
         groupManager.onFileReceived = { header, file ->
-            val isMe = header.senderId == groupSession.myMemberId
-            messageAdapter.addMessage(
-                Message(
-                    id = "${header.timestamp}_${header.senderId}",
-                    type = if (header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
-                        || header.fileName.lowercase(Locale.ROOT).endsWith("png")
-                        || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
-                        || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
-                    ) MessageType.IMAGE else MessageType.FILE,
-                    content = "",
-                    fileName = header.fileName,
-                    fileSize = header.fileSize,
-                    filePath = file.absolutePath,
-                    isFromMe = isMe,
-                    status = MessageStatus.RECEIVED,
-                    timestamp = header.timestamp,
-                    senderName = header.senderName
+            if (header.senderId != groupSession.myMemberId) {
+                messageAdapter.addMessage(
+                    Message(
+                        id = "${header.timestamp}_${header.senderId}",
+                        type = if (header.fileName.lowercase(Locale.ROOT).endsWith("jpg")
+                            || header.fileName.lowercase(Locale.ROOT).endsWith("png")
+                            || header.fileName.lowercase(Locale.ROOT).endsWith("gif")
+                            || header.fileName.lowercase(Locale.ROOT).endsWith("webp")
+                        ) MessageType.IMAGE else MessageType.FILE,
+                        content = "",
+                        fileName = header.fileName,
+                        fileSize = header.fileSize,
+                        filePath = file.absolutePath,
+                        isFromMe = false,
+                        status = MessageStatus.RECEIVED,
+                        timestamp = header.timestamp,
+                        senderName = header.senderName
+                    )
                 )
-            )
-            scrollToBottom()
-            Toast.makeText(this, "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
+                scrollToBottom()
+                Toast.makeText(this, "收到文件：${header.fileName}", Toast.LENGTH_SHORT).show()
+            }
         }
         groupManager.onMemberChanged = { members ->
             memberList = members
@@ -221,7 +222,10 @@ class GroupChatActivity : AppCompatActivity() {
             return
         }
         val viewIntent = Intent(Intent.ACTION_VIEW)
-        viewIntent.setDataAndType(file.toUri(), getMimeType(file.name))
+        viewIntent.setDataAndType(
+            androidx.core.content.FileProvider.getUriForFile(this, "${packageName}.fileprovider", file),
+            getMimeType(file.name)
+        )
         viewIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try {
             startActivity(Intent.createChooser(viewIntent, "打开文件"))

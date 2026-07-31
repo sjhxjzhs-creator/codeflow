@@ -10,6 +10,8 @@ All notable changes to Bchat will be documented in this file.
 - 修复创建/加入群聊失败时错误信息显示为 "null" 的问题
 - 修复发起群聊仅第一次成功的问题：解散/清理时显式释放群服务端口（53319）
 - 修复文件传不出去、报 NetworkOnMainThreadException 的问题：文件/消息/加群等网络操作全部移到后台线程执行
+- 修复群聊自己发送的文本/文件消息额外重复显示一次的问题
+- 修复群聊收到的文件无法打开的问题：改用 FileProvider 并注册群聊文件目录
 
 ### Changed
 - 全部弹窗美化：连接请求、发起群聊、加入群聊、设置昵称、输入密码统一为带图标和 Material 输入框风格
