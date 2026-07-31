@@ -505,7 +505,9 @@ class GroupManager(
             senderName = session.myNickname,
             timestamp = System.currentTimeMillis()
         )
-        forwardMessage(msg, excludeMemberId = null)
+        scope.launch {
+            forwardMessage(msg, excludeMemberId = null)
+        }
     }
 
     // 成员发消息
@@ -520,9 +522,13 @@ class GroupManager(
             timestamp = System.currentTimeMillis()
         )
         if (session.isHost) {
-            hostSendText(content)
+            scope.launch {
+                forwardMessage(msg, excludeMemberId = null)
+            }
         } else {
-            sendTo(memberOutput, TransferProtocol.PacketType.GROUP_MSG, msg)
+            scope.launch {
+                sendTo(memberOutput, TransferProtocol.PacketType.GROUP_MSG, msg)
+            }
             mainHandler.post { onMessageReceived?.invoke(msg) }
         }
     }
@@ -533,39 +539,41 @@ class GroupManager(
         if (file.length() > MAX_GROUP_FILE_SIZE) {
             return Result.failure(Exception("群聊文件大小不能超过5MB"))
         }
-        return try {
-            val header = TransferProtocol.GroupFileHeader(
-                groupId = session.groupId,
-                fileName = file.name,
-                fileSize = file.length(),
-                senderId = session.myMemberId,
-                senderName = session.myNickname,
-                timestamp = System.currentTimeMillis()
-            )
-            val headerJson = gson.toJson(header)
-            val headerBytes = headerJson.toByteArray(Charsets.UTF_8)
-            val fileBytes = file.readBytes()
-            val payload = ByteArray(8 + headerBytes.size + fileBytes.size)
-            writeInt(payload, 0, headerBytes.size)
-            headerBytes.copyInto(payload, 8)
-            fileBytes.copyInto(payload, 8 + headerBytes.size)
+        scope.launch {
+            try {
+                val header = TransferProtocol.GroupFileHeader(
+                    groupId = session.groupId,
+                    fileName = file.name,
+                    fileSize = file.length(),
+                    senderId = session.myMemberId,
+                    senderName = session.myNickname,
+                    timestamp = System.currentTimeMillis()
+                )
+                val headerJson = gson.toJson(header)
+                val headerBytes = headerJson.toByteArray(Charsets.UTF_8)
+                val fileBytes = file.readBytes()
+                val payload = ByteArray(8 + headerBytes.size + fileBytes.size)
+                writeInt(payload, 0, headerBytes.size)
+                headerBytes.copyInto(payload, 8)
+                fileBytes.copyInto(payload, 8 + headerBytes.size)
 
-            if (session.isHost) {
-                // 房主直接广播给所有成员
-                hostMemberClients.values.forEach { c ->
-                    if (!c.isHost && c.socket != null && c.output != null) {
-                        try {
-                            sendRawTo(c.output!!, TransferProtocol.PacketType.GROUP_FILE, payload)
-                        } catch (e: IOException) {}
+                if (session.isHost) {
+                    // 房主直接广播给所有成员
+                    hostMemberClients.values.forEach { c ->
+                        if (!c.isHost && c.socket != null && c.output != null) {
+                            try {
+                                sendRawTo(c.output!!, TransferProtocol.PacketType.GROUP_FILE, payload)
+                            } catch (e: IOException) {}
+                        }
                     }
+                } else {
+                    sendRawTo(memberOutput, TransferProtocol.PacketType.GROUP_FILE, payload)
                 }
-            } else {
-                sendRawTo(memberOutput, TransferProtocol.PacketType.GROUP_FILE, payload)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+        return Result.success(Unit)
     }
 
     // ==================== 群生命周期 ====================
@@ -575,10 +583,12 @@ class GroupManager(
         if (session.isHost) {
             disbandGroupInternal()
         } else {
-            try {
-                sendTo(memberOutput, TransferProtocol.PacketType.GROUP_LEAVE,
-                    TransferProtocol.GroupLeave(session.groupId, session.myMemberId, session.myNickname))
-            } catch (e: Exception) {}
+            scope.launch {
+                try {
+                    sendTo(memberOutput, TransferProtocol.PacketType.GROUP_LEAVE,
+                        TransferProtocol.GroupLeave(session.groupId, session.myMemberId, session.myNickname))
+                } catch (e: Exception) {}
+            }
             leaveGroupInternal()
         }
     }
@@ -590,8 +600,9 @@ class GroupManager(
         } else {
             null
         }
-        hostMemberClients.values.forEach { c ->
-            if (c.socket != null && c.output != null && !c.isHost) {
+        val clients = hostMemberClients.values.filter { c -> c.socket != null && c.output != null && !c.isHost }
+        scope.launch {
+            clients.forEach { c ->
                 try {
                     sendTo(c.output!!, TransferProtocol.PacketType.GROUP_DISBAND, payload ?: "")
                 } catch (e: IOException) {}

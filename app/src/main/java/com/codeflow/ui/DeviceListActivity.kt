@@ -35,8 +35,10 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class DeviceListActivity : AppCompatActivity() {
@@ -405,18 +407,22 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun doJoinGroup(group: Group, nickname: String, password: String?) {
-        val result = groupManager.joinGroup(
-            hostIp = group.hostIp,
-            port = group.hostPort,
-            groupId = group.id,
-            groupName = group.name,
-            password = password,
-            nickname = nickname
-        )
-        if (result.isSuccess) {
-            openGroupChat(groupManager.currentSession)
-        } else {
-            Toast.makeText(this, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                groupManager.joinGroup(
+                    hostIp = group.hostIp,
+                    port = group.hostPort,
+                    groupId = group.id,
+                    groupName = group.name,
+                    password = password,
+                    nickname = nickname
+                )
+            }
+            if (result.isSuccess) {
+                openGroupChat(groupManager.currentSession)
+            } else {
+                Toast.makeText(this@DeviceListActivity, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -530,17 +536,20 @@ class DeviceListActivity : AppCompatActivity() {
                 hostIp = ip, hostPort = port,
                 hasPassword = !password.isNullOrEmpty()
             )
-            val result = groupManager.joinGroup(
-                hostIp = ip, port = port, groupId = "manual",
-                groupName = "", password = password, nickname = nickname
-            )
-            if (result.isSuccess) {
-                openGroupChat(groupManager.currentSession)
-                true
-            } else {
-                Toast.makeText(this, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
-                false
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    groupManager.joinGroup(
+                        hostIp = ip, port = port, groupId = "manual",
+                        groupName = "", password = password, nickname = nickname
+                    )
+                }
+                if (result.isSuccess) {
+                    openGroupChat(groupManager.currentSession)
+                } else {
+                    Toast.makeText(this@DeviceListActivity, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
+                }
             }
+            true
         }
     }
 

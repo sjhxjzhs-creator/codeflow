@@ -135,11 +135,11 @@ class ConnectionManager(context: Context) {
     }
 
     fun sendLargeFile(fileInfo: TransferProtocol.FileInfo, fileInputStream: InputStream, fileSize: Long) {
-        sendPacketSync(TransferProtocol.PacketType.FILE_INFO, fileInfo)
-
         scope.launch {
             try {
                 val os = outputStream ?: return@launch
+                sendPacketSync(TransferProtocol.PacketType.FILE_INFO, fileInfo)
+
                 val sizeBytes = ByteArray(8)
                 var sz = fileSize
                 for (i in 7 downTo 0) {
