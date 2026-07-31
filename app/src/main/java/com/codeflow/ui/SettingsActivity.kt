@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -12,6 +13,7 @@ import com.codeflow.CodeFlowApp
 import com.codeflow.R
 import com.codeflow.databinding.ActivitySettingsBinding
 import com.codeflow.transfer.ConnectionManager
+import com.codeflow.util.AppLog
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -33,6 +35,11 @@ class SettingsActivity : AppCompatActivity() {
         setupGithubLink()
         setupQuickAppLink()
         setupPersonalization()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshLog()
     }
 
     // ==================== 个性化 ====================
@@ -67,11 +74,35 @@ class SettingsActivity : AppCompatActivity() {
             AppCompatDelegate.setDefaultNightMode(next)
             binding.tvThemeValue.text = themeModeLabel(next)
         }
+        setupLogSection()
+    }
 
-        // 液态玻璃：当前为资源级效果，记录偏好（默认开启）
-        binding.swGlass.isChecked = prefs().getBoolean("glass_enabled", true)
-        binding.swGlass.setOnCheckedChangeListener { _, isChecked ->
-            prefs().edit().putBoolean("glass_enabled", isChecked).apply()
+    // ==================== 日志 ====================
+
+    private var logExpanded = false
+
+    private fun setupLogSection() {
+        binding.rowLog.setOnClickListener { toggleLog() }
+        binding.btnClearLog.setOnClickListener {
+            AppLog.clear()
+            refreshLog()
+        }
+        refreshLog()
+    }
+
+    private fun toggleLog() {
+        logExpanded = !logExpanded
+        binding.logPanel.visibility = if (logExpanded) View.VISIBLE else View.GONE
+        binding.btnClearLog.visibility = if (logExpanded) View.VISIBLE else View.GONE
+        if (logExpanded) refreshLog()
+    }
+
+    private fun refreshLog() {
+        val log = AppLog.snapshot()
+        binding.tvAppLog.text = if (log.isEmpty()) {
+            "暂无日志。\n连接异常时的关键步骤会记录在这里。"
+        } else {
+            log.joinToString("\n")
         }
     }
 

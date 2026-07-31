@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.codeflow.CodeFlowApp
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
+import com.codeflow.util.AppLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -135,17 +136,19 @@ class BluetoothDiscovery(private val context: Context) {
                     CodeFlowApp.SERVICE_NAME,
                     UUID.fromString(CodeFlowApp.SERVICE_UUID)
                 )
+                AppLog.log("BT", "蓝牙服务已监听")
 
-                var running = true
-                while (isActive && running) {
-                    val socket = serverSocket?.accept()
-                    socket?.let {
-                        onSocketAccepted(it)
-                        connectedSocket = it
-                        running = false
+                while (isActive) {
+                    val socket = serverSocket?.accept() ?: continue
+                    AppLog.log("BT", "接受到蓝牙连接")
+                    // 交给上层建立流并读取，继续等待后续连接
+                    scope.launch {
+                        onSocketAccepted(socket)
                     }
+                    connectedSocket = socket
                 }
             } catch (e: IOException) {
+                AppLog.log("BT", "蓝牙服务异常: ${e.javaClass.simpleName} ${e.message}")
                 e.printStackTrace()
             }
         }
@@ -161,6 +164,7 @@ class BluetoothDiscovery(private val context: Context) {
                 )
                 bluetoothAdapter?.cancelDiscovery()
                 socket?.connect()
+                AppLog.log("BT", "蓝牙连接成功 ${device.bluetoothAddress}")
                 socket?.let {
                     connectedSocket = it
                     withContext(Dispatchers.Main) {
@@ -168,6 +172,7 @@ class BluetoothDiscovery(private val context: Context) {
                     }
                 }
             } catch (e: IOException) {
+                AppLog.log("BT", "蓝牙连接失败 ${device.bluetoothAddress}: ${e.message}")
                 e.printStackTrace()
             }
         }

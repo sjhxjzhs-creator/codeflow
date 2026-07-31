@@ -1,5 +1,7 @@
 package com.codeflow.transfer
 
+import com.codeflow.util.AppLog
+
 import android.content.Context
 import com.codeflow.CodeFlowApp
 import com.codeflow.bluetooth.BluetoothDiscovery
@@ -66,6 +68,7 @@ class ConnectionManager(context: Context) {
     fun stopNetworkDiscovery() = networkDiscovery.stopDiscovery()
 
     fun startBluetoothServer() {
+        AppLog.log("CONN", "蓝牙服务启动（等待连接请求）")
         _connectionState.value = ConnectionState.WAITING_FOR_REQUEST
         bluetoothDiscovery.startServer { socket ->
             setupBluetoothStreams(socket.inputStream, socket.outputStream)
@@ -74,6 +77,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun startNetworkServer() {
+        AppLog.log("CONN", "局域网服务启动: 端口 ${CodeFlowApp.TRANSFER_PORT}")
         val nd = networkDiscovery
         nd.startServer { socket ->
             setupNetworkStreams(socket.getInputStream(), socket.getOutputStream())
@@ -82,6 +86,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun connectViaBluetooth(device: Device) {
+        AppLog.log("CONN", "尝试蓝牙连接 ${device.bluetoothAddress}")
         _connectionState.value = ConnectionState.CONNECTING
         bluetoothDiscovery.connectToDevice(device) { socket ->
             setupBluetoothStreams(socket.inputStream, socket.outputStream)
@@ -93,6 +98,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun connectViaNetwork(device: Device) {
+        AppLog.log("CONN", "尝试局域网连接 ${device.ipAddress}:${device.port ?: CodeFlowApp.TRANSFER_PORT}")
         _connectionState.value = ConnectionState.CONNECTING
         networkDiscovery.connectToDevice(device) { socket ->
             setupNetworkStreams(socket.getInputStream(), socket.getOutputStream())
@@ -104,6 +110,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun acceptConnection() {
+        AppLog.log("CONN", "接受连接请求")
         val prevState = activeConnection
         _connectionState.value = ConnectionState.CONNECTED
         activeConnection = prevState
@@ -112,6 +119,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun rejectConnection() {
+        AppLog.log("CONN", "拒绝连接请求")
         sendPacket(TransferProtocol.PacketType.CONNECTION_REJECT,
             mapOf("status" to "rejected"))
         disconnect()
@@ -173,6 +181,7 @@ class ConnectionManager(context: Context) {
     }
 
     fun disconnect() {
+        AppLog.log("CONN", "断开连接")
         readJob?.cancel()
         readJob = null
         try { outputStream?.close() } catch (_: IOException) {}
@@ -307,13 +316,22 @@ class ConnectionManager(context: Context) {
                     TransferProtocol.PacketType.CONNECTION_REQUEST -> {
                         val request: TransferProtocol.ConnectionRequest =
                             TransferProtocol.parsePayload(payload)
+                        AppLog.log(
+                            "CONN",
+                            "收到连接请求 from=${request.deviceName}(${request.connectionType})"
+                        )
                         _connectionState.value = ConnectionState.WAITING_FOR_REQUEST
+                        if (onConnectionRequest == null) {
+                            AppLog.log("CONN", "警告: onConnectionRequest 为空，无法弹窗")
+                        }
                         onConnectionRequest?.invoke(request.deviceName, request.connectionType)
                     }
                     TransferProtocol.PacketType.CONNECTION_ACCEPT -> {
+                        AppLog.log("CONN", "收到连接接受，已连接")
                         _connectionState.value = ConnectionState.CONNECTED
                     }
                     TransferProtocol.PacketType.CONNECTION_REJECT -> {
+                        AppLog.log("CONN", "收到连接拒绝")
                         disconnect()
                     }
                     TransferProtocol.PacketType.TEXT_MESSAGE -> {
@@ -365,6 +383,10 @@ class ConnectionManager(context: Context) {
     }
 
     private fun sendConnectionRequest(device: Device) {
+        AppLog.log(
+            "CONN",
+            "已发送连接请求，等待对方接受 from=${device.name}"
+        )
         val request = TransferProtocol.ConnectionRequest(
             deviceId = deviceId,
             deviceName = deviceName,

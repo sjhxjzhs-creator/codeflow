@@ -10,8 +10,10 @@
     <color name="glass_surface">#CC1A212A</color>
     <color name="glass_highlight">#16FFFFFF</color>
     <color name="glass_stroke">#26FFFFFF</color>
+    <color name="bt_avatar_bg">#1A2E44</color>
     <color name="text_primary">#E6EDF3</color>
     <color name="text_secondary">#9DA7B3</color>
+    <color name="group_name">#8B949E</color>
     <color name="text_on_primary">#FFFFFF</color>
     <color name="error">#EF5350</color>
     <color name="bubble_sent">#1565C0</color>

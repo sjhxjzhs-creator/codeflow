@@ -18,8 +18,7 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -33,7 +32,9 @@
                 android:textSize="14sp"
                 android:textColor="@color/text_secondary"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -42,7 +43,7 @@
                 app:cardCornerRadius="@dimen/card_corner_radius"
                 app:strokeWidth="0dp"
                 android:layout_marginBottom="8dp"
-                app:cardBackgroundColor="@color/glass_surface">
+                app:cardBackgroundColor="@color/surface">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -105,15 +106,19 @@
                         android:layout_marginVertical="12dp" />
 
                     <LinearLayout
+                        android:id="@+id/rowLog"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:orientation="horizontal"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <ImageView
                             android:layout_width="24dp"
                             android:layout_height="24dp"
-                            android:src="@drawable/ic_attach"
+                            android:src="@drawable/ic_spider"
                             android:tint="@color/primary" />
 
                         <LinearLayout
@@ -126,25 +131,55 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="液态玻璃"
+                                android:text="日志"
                                 android:textSize="16sp"
                                 android:textColor="@color/text_primary" />
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="半透明磨砂质感"
+                                android:text="连接排查记录"
                                 android:textSize="13sp"
                                 android:textColor="@color/text_secondary" />
 
                         </LinearLayout>
 
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/swGlass"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content" />
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_chevron_right"
+                            android:tint="@color/text_secondary" />
 
                     </LinearLayout>
+
+                    <ScrollView
+                        android:id="@+id/logPanel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:maxHeight="200dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/tvAppLog"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            android:typeface="monospace"
+                            android:textColor="@color/text_secondary"
+                            android:lineSpacingExtra="2dp"
+                            android:text="暂无日志。" />
+
+                    </ScrollView>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearLog"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="清空日志"
+                        android:visibility="gone"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 </LinearLayout>
 
@@ -158,7 +193,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -208,7 +245,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -275,7 +314,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -308,7 +349,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardQuickApp"
@@ -348,7 +391,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -384,7 +429,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardContact"
@@ -424,7 +471,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="16dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -460,7 +509,9 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:paddingTop="8dp"
-                android:paddingBottom="8dp" />
+                android:paddingBottom="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardGithub"

@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.codeflow.R
 import com.codeflow.databinding.ItemMessageBinding
@@ -115,13 +116,16 @@ class MessageAdapter(
         }
 
         private fun bindTextMessage(message: Message) {
-            binding.layoutText.visibility = View.VISIBLE
-            binding.layoutFile.visibility = View.GONE
-            binding.layoutVoice.visibility = View.GONE
+            binding.containerText.visibility = View.VISIBLE
+            binding.containerFile.visibility = View.GONE
+            binding.containerVoice.visibility = View.GONE
 
-            if (groupMode && !message.isFromMe) {
+            if (groupMode) {
                 binding.tvSenderName.visibility = View.VISIBLE
-                binding.tvSenderName.text = message.senderName ?: "成员"
+                binding.tvSenderName.text = message.senderName ?: if (message.isFromMe) "我" else "成员"
+                val lp = binding.tvSenderName.layoutParams as LinearLayout.LayoutParams
+                lp.gravity = if (message.isFromMe) Gravity.END else Gravity.START
+                binding.tvSenderName.layoutParams = lp
             } else {
                 binding.tvSenderName.visibility = View.GONE
             }
@@ -129,7 +133,7 @@ class MessageAdapter(
             binding.tvContent.text = message.content
             binding.tvTime.text = dateFormat.format(Date(message.timestamp))
 
-            val textParams = binding.layoutText.layoutParams as FrameLayout.LayoutParams
+            val textParams = binding.containerText.layoutParams as FrameLayout.LayoutParams
 
             if (message.isFromMe) {
                 textParams.gravity = Gravity.END
@@ -153,21 +157,24 @@ class MessageAdapter(
                 binding.layoutTextFooter.visibility = View.VISIBLE
                 binding.tvStatus.visibility = View.GONE
             }
-            binding.layoutText.layoutParams = textParams
+            binding.containerText.layoutParams = textParams
         }
 
         private fun bindFileMessage(message: Message) {
-            binding.layoutText.visibility = View.GONE
-            binding.layoutFile.visibility = View.VISIBLE
-            binding.layoutVoice.visibility = View.GONE
+            binding.containerText.visibility = View.GONE
+            binding.containerFile.visibility = View.VISIBLE
+            binding.containerVoice.visibility = View.GONE
             binding.tvFileName.text = message.fileName ?: "Unknown"
             binding.tvFileSize.text = formatFileSize(message.fileSize)
 
-            if (groupMode && !message.isFromMe) {
-                binding.tvSenderName.visibility = View.VISIBLE
-                binding.tvSenderName.text = message.senderName ?: "成员"
+            if (groupMode) {
+                binding.tvFileSenderName.visibility = View.VISIBLE
+                binding.tvFileSenderName.text = message.senderName ?: if (message.isFromMe) "我" else "成员"
+                val lp = binding.tvFileSenderName.layoutParams as LinearLayout.LayoutParams
+                lp.gravity = if (message.isFromMe) Gravity.END else Gravity.START
+                binding.tvFileSenderName.layoutParams = lp
             } else {
-                binding.tvSenderName.visibility = View.GONE
+                binding.tvFileSenderName.visibility = View.GONE
             }
 
             val iconRes = when {
@@ -189,7 +196,7 @@ class MessageAdapter(
 
             binding.tvFileTime.text = dateFormat.format(Date(message.timestamp))
 
-            val fileParams = binding.layoutFile.layoutParams as FrameLayout.LayoutParams
+            val fileParams = binding.containerFile.layoutParams as FrameLayout.LayoutParams
             if (message.isFromMe) {
                 fileParams.gravity = Gravity.END
                 binding.layoutFile.setBackgroundResource(0)
@@ -203,7 +210,7 @@ class MessageAdapter(
                     binding.root.context.getColor(R.color.bubble_received), bubbleRadius()
                 )
             }
-            binding.layoutFile.layoutParams = fileParams
+            binding.containerFile.layoutParams = fileParams
 
             binding.layoutFile.setOnClickListener {
                 if (message.status == MessageStatus.RECEIVED || message.status == MessageStatus.SENT) {
@@ -213,13 +220,16 @@ class MessageAdapter(
         }
 
         private fun bindVoiceMessage(message: Message) {
-            binding.layoutText.visibility = View.GONE
-            binding.layoutFile.visibility = View.GONE
-            binding.layoutVoice.visibility = View.VISIBLE
+            binding.containerText.visibility = View.GONE
+            binding.containerFile.visibility = View.GONE
+            binding.containerVoice.visibility = View.VISIBLE
 
-            if (groupMode && !message.isFromMe) {
+            if (groupMode) {
                 binding.tvVoiceSenderName.visibility = View.VISIBLE
-                binding.tvVoiceSenderName.text = message.senderName ?: "成员"
+                binding.tvVoiceSenderName.text = message.senderName ?: if (message.isFromMe) "我" else "成员"
+                val lp = binding.tvVoiceSenderName.layoutParams as LinearLayout.LayoutParams
+                lp.gravity = if (message.isFromMe) Gravity.END else Gravity.START
+                binding.tvVoiceSenderName.layoutParams = lp
             } else {
                 binding.tvVoiceSenderName.visibility = View.GONE
             }
@@ -231,7 +241,7 @@ class MessageAdapter(
             binding.tvVoiceDuration.text = "${message.duration}″"
             binding.tvVoiceTime.text = dateFormat.format(Date(message.timestamp))
 
-            val voiceParams = binding.layoutVoice.layoutParams as FrameLayout.LayoutParams
+            val voiceParams = binding.containerVoice.layoutParams as FrameLayout.LayoutParams
             if (message.isFromMe) {
                 voiceParams.gravity = Gravity.END
                 binding.layoutVoice.setBackgroundResource(0)
@@ -245,7 +255,7 @@ class MessageAdapter(
                     binding.root.context.getColor(R.color.bubble_received), bubbleRadius()
                 )
             }
-            binding.layoutVoice.layoutParams = voiceParams
+            binding.containerVoice.layoutParams = voiceParams
 
             binding.layoutVoice.setOnClickListener {
                 if (message.status == MessageStatus.RECEIVED || message.status == MessageStatus.SENT) {
@@ -255,15 +265,16 @@ class MessageAdapter(
         }
 
         private fun bindSystemMessage(message: Message) {
-            binding.layoutText.visibility = View.VISIBLE
-            binding.layoutFile.visibility = View.GONE
-            binding.layoutVoice.visibility = View.GONE
+            binding.containerText.visibility = View.VISIBLE
+            binding.containerFile.visibility = View.GONE
+            binding.containerVoice.visibility = View.GONE
+            binding.tvSenderName.visibility = View.GONE
             binding.tvContent.text = message.content
             binding.layoutTextFooter.visibility = View.GONE
 
-            val textParams = binding.layoutText.layoutParams as FrameLayout.LayoutParams
+            val textParams = binding.containerText.layoutParams as FrameLayout.LayoutParams
             textParams.gravity = Gravity.CENTER
-            binding.layoutText.layoutParams = textParams
+            binding.containerText.layoutParams = textParams
 
             binding.layoutText.setBackgroundResource(0)
             binding.layoutText.background = roundedRect(

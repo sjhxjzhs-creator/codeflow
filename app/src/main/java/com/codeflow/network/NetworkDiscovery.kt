@@ -6,6 +6,7 @@ import com.codeflow.CodeFlowApp
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
 import com.codeflow.transfer.TransferProtocol
+import com.codeflow.util.AppLog
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,7 @@ class NetworkDiscovery(private val context: Context) {
 
     fun startDiscovery() {
         if (discoveryJob?.isActive == true) return
+        AppLog.log("NET", "开始局域网发现")
         _isDiscovering.value = true
 
         discoveryJob = scope.launch {
@@ -105,6 +107,7 @@ class NetworkDiscovery(private val context: Context) {
                     delay(2000)
                 }
             } catch (e: IOException) {
+                AppLog.log("NET", "发现/组播 socket 异常: ${e.message}")
                 e.printStackTrace()
             } finally {
                 try { multicastSocket?.close() } catch (_: Exception) {}
@@ -164,22 +167,30 @@ class NetworkDiscovery(private val context: Context) {
         serverJob = scope.launch {
             try {
                 serverSocket = ServerSocket(CodeFlowApp.TRANSFER_PORT, 5)
+                AppLog.log("NET", "ServerSocket 已监听端口 ${CodeFlowApp.TRANSFER_PORT}")
                 while (isActive && isServerRunning) {
                     try {
                         val socket = serverSocket?.accept()
                         if (socket != null) {
+                            AppLog.log(
+                                "NET",
+                                "接受到来自 ${socket.inetAddress?.hostAddress} 的连接"
+                            )
                             connectedSocket = socket
                             scope.launch(Dispatchers.Main) {
                                 onAccepted(socket)
                             }
-                            break
                         }
                     } catch (e: IOException) {
                         if (!isServerRunning) break
+                        AppLog.log("NET", "accept 异常: ${e.javaClass.simpleName} ${e.message}")
                     }
                 }
             } catch (e: IOException) {
-                if (isServerRunning) e.printStackTrace()
+                if (isServerRunning) {
+                    AppLog.log("NET", "ServerSocket 启动失败: ${e.message}")
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -195,11 +206,13 @@ class NetworkDiscovery(private val context: Context) {
                 val port = device.port ?: CodeFlowApp.TRANSFER_PORT
                 val socket = Socket()
                 socket.connect(InetSocketAddress(address, port), 10000)
+                AppLog.log("NET", "TCP 连接成功 $address:$port")
                 connectedSocket = socket
                 withContext(Dispatchers.Main) {
                     onConnected(socket)
                 }
             } catch (e: IOException) {
+                AppLog.log("NET", "TCP 连接失败 ${device.ipAddress}:${device.port ?: CodeFlowApp.TRANSFER_PORT}: ${e.message}")
                 withContext(Dispatchers.Main) {
                     e.printStackTrace()
                 }
