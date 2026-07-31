@@ -51,76 +51,52 @@ class NetworkDiscovery(private val context: Context) {
         _isDiscovering.value = true
 
         discoveryJob = scope.launch {
-            val buffer = ByteArray(1024)
             val announceJson = TransferProtocol.toJson(getDeviceInfo())
             val announceBytes = announceJson.toByteArray(Charsets.UTF_8)
-
-            // 多播 socket
+            val buffer = ByteArray(1024)
             var multicastSocket: MulticastSocket? = null
-            // 广播 socket (作为接收备选)
-            var broadcastSocket: DatagramSocket? = null
 
             try {
                 val lock = wifiManager.createMulticastLock("codeflow_disc")
                 lock.acquire()
 
-                // 多播
+                // 单一 socket: 绑定发现端口, 加入组播组, 开启广播收发
+                // 避免多 socket 绑定同一端口导致冲突
+                multicastSocket = MulticastSocket(CodeFlowApp.DISCOVERY_PORT)
+                multicastSocket.broadcast = true
+                multicastSocket.soTimeout = 1000
                 try {
-                    multicastSocket = MulticastSocket(CodeFlowApp.DISCOVERY_PORT)
-                    val group = InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
-                    multicastSocket?.joinGroup(group)
-                    multicastSocket?.soTimeout = 1000
-                } catch (e: Exception) {
-                    // 多播不可用时继续
-                }
+                    multicastSocket.joinGroup(
+                        InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
+                    )
+                } catch (_: Exception) {}
 
-                // 广播接收
-                try {
-                    broadcastSocket = DatagramSocket(CodeFlowApp.DISCOVERY_PORT)
-                    broadcastSocket?.broadcast = true
-                    broadcastSocket?.soTimeout = 1000
-                } catch (e: Exception) {
-                    // 忽略
-                }
-
+                val broadcastAddr = InetAddress.getByName("255.255.255.255")
+                val groupAddr = InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
                 val receivePacket = DatagramPacket(buffer, buffer.size)
 
                 while (isActive && _isDiscovering.value) {
-                    // 发送广播 (255.255.255.255)
+                    // 发送广播
                     try {
-                        val broadcastAddr = InetAddress.getByName("255.255.255.255")
                         val broadcastPacket = DatagramPacket(
                             announceBytes, announceBytes.size,
                             broadcastAddr, CodeFlowApp.DISCOVERY_PORT
                         )
-                        broadcastSocket?.send(broadcastPacket)
-                    } catch (e: Exception) {
-                        // 忽略
-                    }
+                        multicastSocket.send(broadcastPacket)
+                    } catch (_: Exception) {}
 
-                    // 也通过多播发送
+                    // 同时通过组播发送
                     try {
-                        val group = InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
                         val mcPacket = DatagramPacket(
                             announceBytes, announceBytes.size,
-                            group, CodeFlowApp.DISCOVERY_PORT
+                            groupAddr, CodeFlowApp.DISCOVERY_PORT
                         )
-                        multicastSocket?.send(mcPacket)
-                    } catch (e: Exception) {
-                        // 忽略
-                    }
+                        multicastSocket.send(mcPacket)
+                    } catch (_: Exception) {}
 
-                    // 从多播接收
+                    // 接收
                     try {
-                        multicastSocket?.receive(receivePacket)
-                        processReceivedPacket(receivePacket)
-                    } catch (_: SocketTimeoutException) {
-                    } catch (_: IOException) {
-                    }
-
-                    // 从广播接收
-                    try {
-                        broadcastSocket?.receive(receivePacket)
+                        multicastSocket.receive(receivePacket)
                         processReceivedPacket(receivePacket)
                     } catch (_: SocketTimeoutException) {
                     } catch (_: IOException) {
@@ -132,7 +108,6 @@ class NetworkDiscovery(private val context: Context) {
                 e.printStackTrace()
             } finally {
                 try { multicastSocket?.close() } catch (_: Exception) {}
-                try { broadcastSocket?.close() } catch (_: Exception) {}
                 try {
                     val lock = wifiManager.createMulticastLock("codeflow_disc")
                     lock.acquire()

@@ -39,6 +39,7 @@ class DeviceListActivity : AppCompatActivity() {
     private lateinit var deviceAdapter: DeviceAdapter
     
     private var isConnecting = false
+    private var pendingDeviceForFriend: Device? = null
     private var savedFriends = mutableListOf<Device>()
     
     // 当前模式
@@ -243,6 +244,8 @@ class DeviceListActivity : AppCompatActivity() {
                         ConnectionManager.ConnectionState.CONNECTED -> {
                             binding.progressBar.visibility = View.GONE
                             isConnecting = false
+                            pendingDeviceForFriend?.let { saveDeviceToFriendly(it) }
+                            pendingDeviceForFriend = null
                             openTransferActivity()
                         }
                         ConnectionManager.ConnectionState.DISCONNECTED -> {
@@ -330,6 +333,7 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun initiateConnection(device: Device) {
+        pendingDeviceForFriend = device
         when (device.connectionType) {
             ConnectionType.BLUETOOTH -> connectionManager.connectViaBluetooth(device)
             ConnectionType.WIFI -> connectionManager.connectViaNetwork(device)
