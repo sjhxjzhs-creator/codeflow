@@ -60,6 +60,7 @@ class GroupManager(
     private var announceSocket: DatagramSocket? = null
     private var announceJob: Job? = null
     private var serverJob: Job? = null
+    private var serverSocket: ServerSocket? = null
     private var memberReadJob: Job? = null
     private var isHostRunning = false
 
@@ -80,16 +81,20 @@ class GroupManager(
 
     fun createGroup(groupName: String, password: String?, nickname: String): Result<GroupSession> {
         if (isHostRunning) {
-            return Result.failure(Exception("已有一个群在运行"))
+            return Result.failure(Exception("已有一个群在运行，请先解散当前群"))
         }
         return try {
             val memberId = UUID.randomUUID().toString()
             val groupId = "g_${System.currentTimeMillis()}"
+            val localIp = getLocalIpAddress()
+            if (localIp.isNullOrBlank()) {
+                return Result.failure(Exception("无法获取本机IP，请检查是否已连接WiFi"))
+            }
             val hostSession = GroupSession(
                 groupId = groupId,
                 groupName = groupName,
                 hostName = nickname,
-                hostIp = getLocalIpAddress() ?: return Result.failure(Exception("无法获取本机IP，请检查WiFi")),
+                hostIp = localIp,
                 hostPort = GROUP_PORT,
                 isHost = true,
                 myMemberId = memberId,
@@ -106,7 +111,10 @@ class GroupManager(
                 memberCount = 1
             )
 
-            val serverSocket = ServerSocket(GROUP_PORT, 16)
+            val serverSocket = ServerSocket()
+            serverSocket.reuseAddress = true
+            serverSocket.bind(InetSocketAddress(GROUP_PORT), 16)
+            this.serverSocket = serverSocket
             isHostRunning = true
             currentSession = hostSession
 
@@ -380,9 +388,14 @@ class GroupManager(
 
             when (type) {
                 TransferProtocol.PacketType.GROUP_ACCEPT -> {
-                    val result = TransferProtocol.fromJson<TransferProtocol.GroupJoinResult>(
-                        String(payload, Charsets.UTF_8)
-                    )
+                    val result = try {
+                        TransferProtocol.fromJson<TransferProtocol.GroupJoinResult>(
+                            String(payload, Charsets.UTF_8)
+                        )
+                    } catch (e: Exception) {
+                        socket.close()
+                        throw IOException("收到无效的服务端响应")
+                    }
                     val session = GroupSession(
                         groupId = result.groupId,
                         groupName = result.groupName,
@@ -589,6 +602,8 @@ class GroupManager(
         isHostRunning = false
         serverJob?.cancel()
         serverJob = null
+        try { serverSocket?.close() } catch (_: Exception) {}
+        serverSocket = null
         hostMemberClients.clear()
         hostGroupInfo = null
         currentSession = null
@@ -608,6 +623,10 @@ class GroupManager(
         scope.cancel()
         stopGroupAnnounce()
         isHostRunning = false
+        serverJob?.cancel()
+        serverJob = null
+        try { serverSocket?.close() } catch (_: Exception) {}
+        serverSocket = null
         try { hostMemberClients.values.forEach { it.socket?.close() } } catch (_: Exception) {}
         hostMemberClients.clear()
         try { memberSocket?.close() } catch (_: Exception) {}

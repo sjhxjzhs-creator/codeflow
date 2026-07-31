@@ -13,7 +13,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -21,6 +20,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.codeflow.CodeFlowApp
 import com.codeflow.R
 import com.codeflow.databinding.ActivityDeviceListBinding
+import com.codeflow.databinding.DialogConnectionRequestBinding
+import com.codeflow.databinding.DialogFormBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
 import com.codeflow.model.Group
@@ -29,6 +30,9 @@ import com.codeflow.transfer.ConnectionManager
 import com.codeflow.transfer.GroupManager
 import com.codeflow.ui.adapter.DeviceAdapter
 import com.codeflow.ui.adapter.GroupAdapter
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.collectLatest
@@ -293,18 +297,28 @@ class DeviceListActivity : AppCompatActivity() {
 
         connectionManager.onConnectionRequest = { remoteName, _ ->
             runOnUiThread {
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.connection_request)
-                    .setMessage(getString(R.string.connection_request_msg, remoteName))
+                val dialogView = layoutInflater.inflate(
+                    R.layout.dialog_connection_request, null
+                )
+                val viewBinding = DialogConnectionRequestBinding.bind(dialogView)
+                viewBinding.tvMessage.text =
+                    getString(R.string.connection_request_msg, remoteName)
+
+                MaterialAlertDialogBuilder(this)
+                    .setView(dialogView)
                     .setCancelable(false)
-                    .setPositiveButton(R.string.accept) { _, _ ->
-                        connectionManager.acceptConnection()
-                    }
-                    .setNegativeButton(R.string.reject) { _, _ ->
-                        connectionManager.rejectConnection()
-                        isConnecting = false
-                    }
                     .show()
+                    .apply {
+                        viewBinding.btnReject.setOnClickListener {
+                            connectionManager.rejectConnection()
+                            isConnecting = false
+                            dismiss()
+                        }
+                        viewBinding.btnAccept.setOnClickListener {
+                            connectionManager.acceptConnection()
+                            dismiss()
+                        }
+                    }
             }
         }
 
@@ -402,158 +416,165 @@ class DeviceListActivity : AppCompatActivity() {
         if (result.isSuccess) {
             openGroupChat(groupManager.currentSession)
         } else {
-            Toast.makeText(this, "加入失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun showFormDialog(
+        title: String,
+        iconRes: Int,
+        confirmText: String,
+        fields: List<Pair<String, Int>>,
+        onConfirm: (List<String>) -> Boolean
+    ) {
+        val formView = layoutInflater.inflate(R.layout.dialog_form, null)
+        val formBinding = DialogFormBinding.bind(formView)
+        formBinding.ivIcon.setImageResource(iconRes)
+        formBinding.tvTitle.text = title
+        formBinding.btnConfirm.text = confirmText
+        formBinding.btnCancel.text = "取消"
+
+        val inputs = mutableListOf<android.widget.EditText>()
+        val pad = (12 * resources.displayMetrics.density).toInt()
+        fields.forEachIndexed { index, (hint, inputType) ->
+            val inputLayout = TextInputLayout(this).apply {
+                this.hint = hint
+                boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+                setBoxStrokeColor(ContextCompat.getColor(this@DeviceListActivity, R.color.primary))
+            }
+            val editText = TextInputEditText(this).apply {
+                this.inputType = inputType
+                setSingleLine(true)
+            }
+            inputLayout.addView(editText)
+            inputs.add(editText)
+            val lp = android.widget.LinearLayout.LayoutParams(match, wrap)
+            if (index > 0) lp.topMargin = pad
+            formBinding.inputContainer.addView(inputLayout, lp)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setView(formView)
+            .setCancelable(false)
+            .show()
+            .apply {
+                formBinding.btnCancel.setOnClickListener { dismiss() }
+                formBinding.btnConfirm.setOnClickListener {
+                    val values = inputs.map { it.text.toString() }
+                    if (onConfirm(values)) {
+                        dismiss()
+                    }
+                }
+            }
     }
 
     private fun showCreateGroupDialog() {
-        val context = this
-        val nicknameInput = android.widget.EditText(context).apply {
-            hint = "你的昵称（如：小明）"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-        val nameInput = android.widget.EditText(context).apply {
-            hint = "群聊名称"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-        val passwordInput = android.widget.EditText(context).apply {
-            hint = "入群密码（可选，留空则免密）"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        val layout = android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            val pad = (16 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad, pad, 0)
-            addView(nicknameInput)
-            addView(nameInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
-                topMargin = pad
-            })
-            addView(passwordInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
-                topMargin = pad
-            })
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("发起群聊")
-            .setView(layout)
-            .setPositiveButton("创建") { _, _ ->
-                val nickname = nicknameInput.text.toString().trim()
-                val groupName = nameInput.text.toString().trim()
-                if (nickname.isEmpty() || groupName.isEmpty()) {
-                    Toast.makeText(this, "请填写昵称和群名", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                val password = passwordInput.text.toString().trim().takeIf { it.isNotEmpty() }
-                val result = groupManager.createGroup(groupName, password, nickname)
-                if (result.isSuccess) {
-                    Toast.makeText(this, "群聊已创建，可在群聊页看到", Toast.LENGTH_SHORT).show()
-                    openGroupChat(groupManager.currentSession)
-                } else {
-                    Toast.makeText(this, "创建失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                }
+        showFormDialog(
+            title = "发起群聊",
+            iconRes = R.drawable.ic_friends,
+            confirmText = "创建",
+            fields = listOf(
+                "你的昵称（如：小明）" to android.text.InputType.TYPE_CLASS_TEXT,
+                "群聊名称" to android.text.InputType.TYPE_CLASS_TEXT,
+                "入群密码（可选，留空则免密）" to
+                    (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            )
+        ) { values ->
+            val nickname = values[0].trim()
+            val groupName = values[1].trim()
+            val password = values[2].trim().takeIf { it.isNotEmpty() }
+            if (nickname.isEmpty() || groupName.isEmpty()) {
+                Toast.makeText(this, "请填写昵称和群名", Toast.LENGTH_SHORT).show()
+                return@showFormDialog false
             }
-            .setNegativeButton("取消", null)
-            .show()
+            val result = groupManager.createGroup(groupName, password, nickname)
+            if (result.isSuccess) {
+                Toast.makeText(this, "群聊已创建，可在群聊页看到", Toast.LENGTH_SHORT).show()
+                openGroupChat(groupManager.currentSession)
+                true
+            } else {
+                Toast.makeText(this, "创建失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
+                false
+            }
+        }
     }
 
     private fun showJoinGroupDialog() {
-        val context = this
-        val nicknameInput = android.widget.EditText(context).apply {
-            hint = "你的昵称"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-        val addressInput = android.widget.EditText(context).apply {
-            hint = "输入 IP:端口（如 192.168.1.5:53319）"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT
-        }
-        val passwordInput = android.widget.EditText(context).apply {
-            hint = "入群密码（如有）"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        val layout = android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            val pad = (16 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad, pad, 0)
-            addView(nicknameInput)
-            addView(addressInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
-                topMargin = pad
-            })
-            addView(passwordInput, android.widget.LinearLayout.LayoutParams(match, wrap).apply {
-                topMargin = pad
-            })
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("加入群聊")
-            .setView(layout)
-            .setPositiveButton("加入") { _, _ ->
-                val nickname = nicknameInput.text.toString().trim()
-                val address = addressInput.text.toString().trim()
-                if (nickname.isEmpty() || address.isEmpty()) {
-                    Toast.makeText(this, "请填写昵称和地址", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                val parts = address.split(":")
-                if (parts.size < 2 || parts[0].isBlank() || parts[1].toIntOrNull() == null) {
-                    Toast.makeText(this, "地址格式错误，应为 IP:端口", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                val ip = parts[0].trim()
-                val port = parts[1].trim().toInt()
-                val password = passwordInput.text.toString().trim().takeIf { it.isNotEmpty() }
-
-                // 直接通过 IP:Port 加入，groupId 未知，用占位
-                val group = Group(
-                    id = "manual", name = "", hostName = "",
-                    hostIp = ip, hostPort = port,
-                    hasPassword = !password.isNullOrEmpty()
-                )
-                val result = groupManager.joinGroup(
-                    hostIp = ip, port = port, groupId = "manual",
-                    groupName = "", password = password, nickname = nickname
-                )
-                if (result.isSuccess) {
-                    openGroupChat(groupManager.currentSession)
-                } else {
-                    Toast.makeText(this, "加入失败：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                }
+        showFormDialog(
+            title = "加入群聊",
+            iconRes = R.drawable.ic_search,
+            confirmText = "加入",
+            fields = listOf(
+                "你的昵称" to android.text.InputType.TYPE_CLASS_TEXT,
+                "输入 IP:端口（如 192.168.1.5:53319）" to android.text.InputType.TYPE_CLASS_TEXT,
+                "入群密码（如有）" to
+                    (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            )
+        ) { values ->
+            val nickname = values[0].trim()
+            val address = values[1].trim()
+            val password = values[2].trim().takeIf { it.isNotEmpty() }
+            if (nickname.isEmpty() || address.isEmpty()) {
+                Toast.makeText(this, "请填写昵称和地址", Toast.LENGTH_SHORT).show()
+                return@showFormDialog false
             }
-            .setNegativeButton("取消", null)
-            .show()
+            val parts = address.split(":")
+            if (parts.size < 2 || parts[0].isBlank() || parts[1].toIntOrNull() == null) {
+                Toast.makeText(this, "地址格式错误，应为 IP:端口", Toast.LENGTH_SHORT).show()
+                return@showFormDialog false
+            }
+            val ip = parts[0].trim()
+            val port = parts[1].trim().toInt()
+            val group = Group(
+                id = "manual", name = "", hostName = "",
+                hostIp = ip, hostPort = port,
+                hasPassword = !password.isNullOrEmpty()
+            )
+            val result = groupManager.joinGroup(
+                hostIp = ip, port = port, groupId = "manual",
+                groupName = "", password = password, nickname = nickname
+            )
+            if (result.isSuccess) {
+                openGroupChat(groupManager.currentSession)
+                true
+            } else {
+                Toast.makeText(this, "加入失败：${errorMessage(result.exceptionOrNull())}", Toast.LENGTH_LONG).show()
+                false
+            }
+        }
     }
 
     private fun promptNickname(onResult: (String) -> Unit) {
-        val input = android.widget.EditText(this).apply {
-            hint = "请输入一次性昵称"
-        }
-        AlertDialog.Builder(this)
-            .setTitle("设置昵称")
-            .setView(input)
-            .setPositiveButton("确定") { _, _ ->
-                val nickname = input.text.toString().trim()
-                if (nickname.isEmpty()) {
-                    Toast.makeText(this, "昵称不能为空", Toast.LENGTH_SHORT).show()
-                } else {
-                    onResult(nickname)
-                }
+        showFormDialog(
+            title = "设置昵称",
+            iconRes = R.drawable.ic_friends,
+            confirmText = "确定",
+            fields = listOf("请输入一次性昵称" to android.text.InputType.TYPE_CLASS_TEXT)
+        ) { values ->
+            val nickname = values[0].trim()
+            if (nickname.isEmpty()) {
+                Toast.makeText(this, "昵称不能为空", Toast.LENGTH_SHORT).show()
+                false
+            } else {
+                onResult(nickname)
+                true
             }
-            .setNegativeButton("取消", null)
-            .show()
+        }
     }
 
     private fun promptPassword(onResult: (String) -> Unit) {
-        val input = android.widget.EditText(this).apply {
-            hint = "请输入入群密码"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        showFormDialog(
+            title = "输入密码",
+            iconRes = R.drawable.ic_friends,
+            confirmText = "确定",
+            fields = listOf(
+                "请输入入群密码" to
+                    (android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            )
+        ) { values ->
+            onResult(values[0])
+            true
         }
-        AlertDialog.Builder(this)
-            .setTitle("输入密码")
-            .setView(input)
-            .setPositiveButton("确定") { _, _ ->
-                onResult(input.text.toString())
-            }
-            .setNegativeButton("取消", null)
-            .show()
     }
 
     private fun openGroupChat(session: GroupSession?) {
@@ -580,6 +601,17 @@ class DeviceListActivity : AppCompatActivity() {
     private fun openTransferActivity() {
         val intent = Intent(this, TransferActivity::class.java)
         startActivity(intent)
+    }
+
+    private fun errorMessage(t: Throwable?): String {
+        t ?: return "未知错误"
+        val msg = t.message
+        return if (msg.isNullOrBlank() || msg == "null") {
+            (t.cause?.message?.takeIf { !it.isNullOrBlank() && it != "null" })
+                ?: t.javaClass.simpleName
+        } else {
+            msg
+        }
     }
 
     private fun updateEmptyView(isEmpty: Boolean, hint: String? = null) {
