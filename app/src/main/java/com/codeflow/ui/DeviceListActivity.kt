@@ -20,16 +20,23 @@ import com.codeflow.databinding.ActivityDeviceListBinding
 import com.codeflow.model.ConnectionType
 import com.codeflow.model.Device
 import com.codeflow.transfer.ConnectionManager
+import com.codeflow.transfer.GroupManager
+import com.codeflow.model.Group
 import com.codeflow.ui.adapter.DeviceAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context.CLIPBOARD_SERVICE
 
 class DeviceListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDeviceListBinding
     private lateinit var connectionManager: ConnectionManager
+    private lateinit var groupManager: GroupManager
     private lateinit var deviceAdapter: DeviceAdapter
     private var isConnecting = false
+    private var currentGroup: Group? = null
 
     private val isBluetoothMode: Boolean
         get() = binding.chipBluetooth.isChecked
@@ -58,6 +65,7 @@ class DeviceListActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         connectionManager = (application as CodeFlowApp).connectionManager
+        groupManager = GroupManager(this)
         setupDeviceInfo()
         setupUI()
         observeState()
@@ -108,6 +116,15 @@ class DeviceListActivity : AppCompatActivity() {
         binding.btnRefresh.setOnClickListener {
             isConnecting = false
             refreshDevices()
+        }
+        
+        // 群聊按钮
+        binding.fabCreateGroup.setOnClickListener {
+            showCreateGroupDialog()
+        }
+        
+        binding.fabJoinGroup.setOnClickListener {
+            showJoinGroupDialog()
         }
     }
 
@@ -230,11 +247,104 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun initiateConnection(device: Device) {
-        binding.progressBar.visibility = View.VISIBLE
         when (device.connectionType) {
             com.codeflow.model.ConnectionType.BLUETOOTH -> connectionManager.connectViaBluetooth(device)
             com.codeflow.model.ConnectionType.WIFI -> connectionManager.connectViaNetwork(device)
         }
+    }
+    
+    private fun showCreateGroupDialog() {
+        // 检查权限
+        val requiredPermissions = listOfNotNull(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                null
+            } else {
+                Manifest.permission.ACCESS_WIFI_STATE
+            }
+        ).filterNotNull()
+        
+        val notGranted = requiredPermissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        
+        if (notGranted.isNotEmpty()) {
+            requestPermissionLauncher.launch(notGranted.toTypedArray())
+            return
+        }
+        
+        // 创建群聊
+        lifecycleScope.launch {
+            currentGroup = groupManager.createGroup()
+            currentGroup?.let { group ->
+                // 显示群聊信息对话框
+                val connectionInfo = groupManager.getGroupConnectionInfo() ?: return@let
+                
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("group_info", connectionInfo))
+                
+                androidx.appcompat.app.AlertDialog.Builder(this@DeviceListActivity)
+                    .setTitle("群聊已创建")
+                    .setMessage("已复制群聊信息到剪贴板：\n\n$connectionInfo\n\n请将此信息发送给要邀请的成员，让他们手动输入或扫描二维码加入。")
+                    .setPositiveButton("分享") { _, _ ->
+                        // 分享群聊信息
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, connectionInfo)
+                        }
+                        startActivity(Intent.createChooser(shareIntent, "分享群聊"))
+                    }
+                    .setNeutralButton("进入群聊") { _, _ ->
+                        // 跳转到群聊界面
+                        val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
+                            putExtra(GroupChatActivity.EXTRA_GROUP_ID, group.groupId)
+                            putExtra(GroupChatActivity.EXTRA_IS_HOST, true)
+                        }
+                        startActivity(intent)
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            } ?: run {
+                Toast.makeText(this@DeviceListActivity, "创建群聊失败", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
+    private fun showJoinGroupDialog() {
+        val editTextView = android.widget.EditText(this).apply {
+            hint = "IP:Port (例如：192.168.43.1:53318)"
+            setTextSize(16f)
+            setPadding(50, 40, 50, 10)
+        }
+        
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("加入群聊")
+            .setMessage("请输入群主的 IP 地址和端口：")
+            .setView(editTextView)
+            .setPositiveButton("连接") { _, _ ->
+                val input = editTextView.text.toString().trim()
+                val parts = input.split(":")
+                if (parts.size == 2) {
+                    try {
+                        val hostIp = parts[0].trim()
+                        val hostPort = parts[1].trim().toInt()
+                        val groupId = java.util.UUID.randomUUID().toString()
+                        
+                        val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
+                            putExtra(GroupChatActivity.EXTRA_GROUP_ID, groupId)
+                            putExtra(GroupChatActivity.EXTRA_IS_HOST, false)
+                            putExtra(GroupChatActivity.EXTRA_HOST_IP, hostIp)
+                            putExtra(GroupChatActivity.EXTRA_HOST_PORT, hostPort)
+                        }
+                        startActivity(intent)
+                    } catch (e: NumberFormatException) {
+                        Toast.makeText(this, "端口号格式错误", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, "请输入有效的 IP:Port", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun openTransferActivity() {
@@ -250,6 +360,6 @@ class DeviceListActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // 不清理连接，保持连接状态给 TransferActivity
+        groupManager.cleanup()
     }
 }

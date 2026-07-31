@@ -19,6 +19,15 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/tvSenderName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:textColor="#88FFFFFF"
+            android:layout_marginBottom="2dp"
+            android:visibility="gone" />
+
+        <TextView
             android:id="@+id/tvContent"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
