@@ -36,8 +36,8 @@ class DeviceListActivity : AppCompatActivity() {
     private lateinit var binding: ActivityDeviceListBinding
     private lateinit var connectionManager: ConnectionManager
     private lateinit var groupManager: GroupManager
-    private lateinit var deviceAdapter: DeviceAdapter
     private lateinit var prefs: SharedPreferences
+    private lateinit var deviceAdapter: DeviceAdapter
     
     private var isConnecting = false
     private var currentGroup: Group? = null
@@ -53,17 +53,12 @@ class DeviceListActivity : AppCompatActivity() {
         val memberCount: Int
     )
 
-    private val isBluetoothMode: Boolean
-        get() = binding.chipBluetooth.isChecked
+    // 当前模式
+    private enum class Mode {
+        BLUETOOTH, WIFI, FRIENDS, CHAT_ROOMS
+    }
     
-    private val isWifiMode: Boolean
-        get() = binding.chipWifi.isChecked
-    
-    private val isFriendsMode: Boolean
-        get() = binding.chipFriends.isChecked
-    
-    private val isChatRoomsMode: Boolean
-        get() = binding.chipChatRooms.isChecked
+    private var currentMode = Mode.WIFI
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -90,6 +85,7 @@ class DeviceListActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("bchat_prefs", Context.MODE_PRIVATE)
         loadSavedFriends()
+        loadChatRooms()
 
         connectionManager = (application as CodeFlowApp).connectionManager
         groupManager = GroupManager(this)
@@ -99,6 +95,9 @@ class DeviceListActivity : AppCompatActivity() {
         setupChipListeners()
         observeState()
         requestPermissions()
+        
+        // 默认显示 WiFi 模式
+        setMode(Mode.WIFI)
     }
 
     private fun setupDeviceInfo() {
@@ -137,50 +136,60 @@ class DeviceListActivity : AppCompatActivity() {
             adapter = deviceAdapter
         }
         
-        // 默认显示 WiFi 设备
-        binding.chipWifi.isChecked = true
+        // 好友操作按钮
+        binding.btnCreateGroup.setOnClickListener {
+            showCreateGroupDialog()
+        }
+        binding.btnJoinGroup.setOnClickListener {
+            showJoinGroupDialog()
+        }
     }
 
     private fun setupChipListeners() {
-        binding.chipGroup.setOnCheckedStateChangeListener { _, _ ->
-            isConnecting = false
-            refreshDevices()
-        }
+        binding.chipBluetooth.setOnClickListener { setMode(Mode.BLUETOOTH) }
+        binding.chipWifi.setOnClickListener { setMode(Mode.WIFI) }
+        binding.chipFriends.setOnClickListener { setMode(Mode.FRIENDS) }
+        binding.chipChatRooms.setOnClickListener { setMode(Mode.CHAT_ROOMS) }
+    }
+    
+    private fun setMode(mode: Mode) {
+        currentMode = mode
         
-        binding.chipFriends.setOnClickListener {
-            if (!binding.chipFriends.isChecked) {
-                binding.chipFriends.isChecked = true
-            }
-            isConnecting = false
-            showFriendsView()
-        }
+        // 重置所有 chip 状态
+        binding.chipBluetooth.isChecked = (mode == Mode.BLUETOOTH)
+        binding.chipWifi.isChecked = (mode == Mode.WIFI)
+        binding.chipFriends.isChecked = (mode == Mode.FRIENDS)
+        binding.chipChatRooms.isChecked = (mode == Mode.CHAT_ROOMS)
         
-        binding.chipChatRooms.setOnClickListener {
-            if (!binding.chipChatRooms.isChecked) {
-                binding.chipChatRooms.isChecked = true
+        isConnecting = false
+        
+        // 更新 UI
+        when (mode) {
+            Mode.BLUETOOTH -> {
+                binding.friendActionsLayout.visibility = View.GONE
+                refreshDevices()
             }
-            isConnecting = false
-            showChatRoomsView()
+            Mode.WIFI -> {
+                binding.friendActionsLayout.visibility = View.GONE
+                refreshDevices()
+            }
+            Mode.FRIENDS -> {
+                binding.friendActionsLayout.visibility = View.VISIBLE
+                showFriendsView()
+            }
+            Mode.CHAT_ROOMS -> {
+                binding.friendActionsLayout.visibility = View.GONE
+                showChatRoomsView()
+            }
         }
     }
 
     private fun showFriendsView() {
-        binding.chipBluetooth.isChecked = false
-        binding.chipWifi.isChecked = false
-        binding.chipChatRooms.isChecked = false
-        
         deviceAdapter.submitList(savedFriends)
-        updateEmptyView(savedFriends.isEmpty(), "暂无好友")
-        
-        // 显示操作按钮
-        showFriendActionsDialog()
+        updateEmptyView(savedFriends.isEmpty(), "暂无好友\n连接过的设备会自动保存到好友列表")
     }
     
     private fun showChatRoomsView() {
-        binding.chipBluetooth.isChecked = false
-        binding.chipWifi.isChecked = false
-        binding.chipFriends.isChecked = false
-        
         val chatRoomDevices = availableChatRooms.map { chatRoom ->
             Device(
                 id = chatRoom.groupId,
@@ -193,27 +202,14 @@ class DeviceListActivity : AppCompatActivity() {
         }
         
         deviceAdapter.submitList(chatRoomDevices)
-        updateEmptyView(chatRoomDevices.isEmpty(), "暂无聊天室")
-    }
-
-    private fun showFriendActionsDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("好友操作")
-            .setItems(arrayOf("发起群聊", "加入群聊")) { _, which ->
-                when (which) {
-                    0 -> showCreateGroupDialog()
-                    1 -> showJoinGroupDialog()
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
+        updateEmptyView(chatRoomDevices.isEmpty(), "暂无聊天室\n好友发起的群聊会显示在这里")
     }
 
     private fun observeState() {
         lifecycleScope.launch {
             launch {
                 connectionManager.getBluetoothDevices().collectLatest { devices ->
-                    if (isBluetoothMode) {
+                    if (currentMode == Mode.BLUETOOTH) {
                         deviceAdapter.submitList(devices)
                         updateEmptyView(devices.isEmpty(), "未发现蓝牙设备")
                     }
@@ -221,7 +217,7 @@ class DeviceListActivity : AppCompatActivity() {
             }
             launch {
                 connectionManager.getNetworkDevices().collectLatest { devices ->
-                    if (isWifiMode) {
+                    if (currentMode == Mode.WIFI) {
                         deviceAdapter.submitList(devices)
                         updateEmptyView(devices.isEmpty(), "未发现局域网设备")
                     }
@@ -303,7 +299,7 @@ class DeviceListActivity : AppCompatActivity() {
     }
 
     private fun refreshDevices() {
-        if (isBluetoothMode) {
+        if (currentMode == Mode.BLUETOOTH) {
             val bt = connectionManager.getBluetoothDiscovery()
             if (!bt.isAvailable()) {
                 Toast.makeText(this, "该设备不支持蓝牙", Toast.LENGTH_SHORT).show()
@@ -317,7 +313,7 @@ class DeviceListActivity : AppCompatActivity() {
             connectionManager.stopNetworkDiscovery()
             connectionManager.startBluetoothDiscovery()
             connectionManager.startBluetoothServer()
-        } else if (isWifiMode) {
+        } else if (currentMode == Mode.WIFI) {
             connectionManager.stopBluetoothDiscovery()
             connectionManager.startNetworkDiscovery()
             connectionManager.startNetworkServer()
@@ -339,7 +335,7 @@ class DeviceListActivity : AppCompatActivity() {
             currentGroup?.let { group ->
                 val connectionInfo = groupManager.getGroupConnectionInfo() ?: return@let
                 
-                // 保存群聊信息到聊天室列表
+                // 保存到聊天室列表
                 val ipMatch = try {
                     connectionInfo.substringAfter("\"ip\":").substringAfter("\"").substringBefore("\"")
                 } catch (e: Exception) { "" }
@@ -357,12 +353,13 @@ class DeviceListActivity : AppCompatActivity() {
                 ))
                 saveChatRooms()
                 
+                // 复制到剪贴板
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("group_info", connectionInfo))
                 
                 AlertDialog.Builder(this@DeviceListActivity)
                     .setTitle("群聊已创建")
-                    .setMessage("已复制群聊信息到剪贴板：\n\n$connectionInfo\n\n请将此信息分享给要邀请的好友。")
+                    .setMessage("已复制群聊信息到剪贴板，分享给好友邀请他们加入。")
                     .setPositiveButton("分享") { _, _ ->
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
@@ -423,10 +420,8 @@ class DeviceListActivity : AppCompatActivity() {
             .show()
     }
     
-    // 请求加入聊天室（群主会收到通知）
+    // 请求加入聊天室（简化版：直接连接）
     private fun requestJoinChatRoom(chatRoom: ChatRoomInfo) {
-        // TODO: 实现向群主发送加入请求的逻辑
-        // 这里简化处理，直接连接
         val intent = Intent(this@DeviceListActivity, GroupChatActivity::class.java).apply {
             putExtra(GroupChatActivity.EXTRA_GROUP_ID, chatRoom.groupId)
             putExtra(GroupChatActivity.EXTRA_IS_HOST, false)
@@ -462,6 +457,7 @@ class DeviceListActivity : AppCompatActivity() {
         }
     }
     
+    // 连接成功后保存设备到好友
     private fun saveDeviceToFriendly(device: Device) {
         if (!savedFriends.any { it.id == device.id }) {
             savedFriends.add(device)
