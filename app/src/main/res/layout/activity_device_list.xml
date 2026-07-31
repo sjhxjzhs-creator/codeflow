@@ -49,7 +49,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="16dp"
-        android:background="@android:color/white"
+        android:background="@color/surface"
         android:gravity="center"
         android:visibility="gone">
 
