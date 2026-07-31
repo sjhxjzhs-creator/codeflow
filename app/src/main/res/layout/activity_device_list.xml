@@ -33,28 +33,32 @@
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/bluetooth" />
+                app:chipIcon="@drawable/ic_bluetooth"
+                app:chipIconVisible="true" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipWifi"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/wifi" />
+                app:chipIcon="@drawable/ic_wifi"
+                app:chipIconVisible="true" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipFriends"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="好友" />
+                app:chipIcon="@drawable/ic_friends"
+                app:chipIconVisible="true" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipChatRooms"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="聊天室" />
+                app:chipIcon="@drawable/ic_search"
+                app:chipIconVisible="true" />
 
         </LinearLayout>
 
