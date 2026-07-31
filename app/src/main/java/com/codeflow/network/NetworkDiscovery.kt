@@ -55,67 +55,80 @@ class NetworkDiscovery(private val context: Context) {
         discoveryJob = scope.launch {
             val announceJson = TransferProtocol.toJson(getDeviceInfo())
             val announceBytes = announceJson.toByteArray(Charsets.UTF_8)
-            val buffer = ByteArray(1024)
-            var multicastSocket: MulticastSocket? = null
+            val buffer = ByteArray(2048)
+            var receiveSocket: MulticastSocket? = null
+            var announceSocket: DatagramSocket? = null
 
             try {
-                val lock = wifiManager.createMulticastLock("codeflow_disc")
-                lock.acquire()
-
-                // 单一 socket: 绑定发现端口, 加入组播组, 开启广播收发
-                // 避免多 socket 绑定同一端口导致冲突
-                multicastSocket = MulticastSocket(CodeFlowApp.DISCOVERY_PORT)
-                multicastSocket.broadcast = true
-                multicastSocket.soTimeout = 1000
+                var lock: WifiManager.MulticastLock? = null
                 try {
-                    multicastSocket.joinGroup(
-                        InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
-                    )
+                    lock = wifiManager.createMulticastLock("codeflow_disc")
+                    lock.acquire()
                 } catch (_: Exception) {}
 
-                val broadcastAddr = InetAddress.getByName("255.255.255.255")
+                // 发送端：独立随机端口 DatagramSocket，发向组播组和广播地址
+                announceSocket = DatagramSocket()
+                announceSocket.broadcast = true
                 val groupAddr = InetAddress.getByName(CodeFlowApp.MULTICAST_ADDRESS)
+                val broadcastAddr = InetAddress.getByName("255.255.255.255")
+
+                // 接收端：直接绑定发现端口的 MulticastSocket 并加入组播组，只负责接收。
+                // 采用与群聊（GroupManager）已验证可用的相同构造方式。
+                receiveSocket = MulticastSocket(CodeFlowApp.DISCOVERY_PORT)
+                receiveSocket.broadcast = true
+                receiveSocket.soTimeout = 1000
+                try {
+                    receiveSocket.joinGroup(groupAddr)
+                } catch (e: Exception) {
+                    AppLog.log("NET", "joinGroup 失败: ${e.message}")
+                }
+
                 val receivePacket = DatagramPacket(buffer, buffer.size)
 
                 while (isActive && _isDiscovering.value) {
+                    // 发送组播
+                    try {
+                        announceSocket.send(
+                            DatagramPacket(
+                                announceBytes, announceBytes.size,
+                                groupAddr, CodeFlowApp.DISCOVERY_PORT
+                            )
+                        )
+                    } catch (_: Exception) {}
+
                     // 发送广播
                     try {
-                        val broadcastPacket = DatagramPacket(
-                            announceBytes, announceBytes.size,
-                            broadcastAddr, CodeFlowApp.DISCOVERY_PORT
+                        announceSocket.send(
+                            DatagramPacket(
+                                announceBytes, announceBytes.size,
+                                broadcastAddr, CodeFlowApp.DISCOVERY_PORT
+                            )
                         )
-                        multicastSocket.send(broadcastPacket)
                     } catch (_: Exception) {}
 
-                    // 同时通过组播发送
-                    try {
-                        val mcPacket = DatagramPacket(
-                            announceBytes, announceBytes.size,
-                            groupAddr, CodeFlowApp.DISCOVERY_PORT
-                        )
-                        multicastSocket.send(mcPacket)
-                    } catch (_: Exception) {}
-
-                    // 接收
-                    try {
-                        multicastSocket.receive(receivePacket)
-                        processReceivedPacket(receivePacket)
-                    } catch (_: SocketTimeoutException) {
-                    } catch (_: IOException) {
+                    // 接收（循环处理到超时为止，避免漏包）
+                    val receiveDeadline = System.currentTimeMillis() + 1000
+                    while (System.currentTimeMillis() < receiveDeadline) {
+                        try {
+                            receiveSocket.receive(receivePacket)
+                            processReceivedPacket(receivePacket)
+                        } catch (_: SocketTimeoutException) {
+                            break
+                        } catch (_: IOException) {
+                            break
+                        }
                     }
 
-                    delay(2000)
+                    delay(1000)
                 }
+
+                try { lock?.release() } catch (_: Exception) {}
             } catch (e: IOException) {
                 AppLog.log("NET", "发现/组播 socket 异常: ${e.message}")
                 e.printStackTrace()
             } finally {
-                try { multicastSocket?.close() } catch (_: Exception) {}
-                try {
-                    val lock = wifiManager.createMulticastLock("codeflow_disc")
-                    lock.acquire()
-                    lock.release()
-                } catch (_: Exception) {}
+                try { receiveSocket?.close() } catch (_: Exception) {}
+                try { announceSocket?.close() } catch (_: Exception) {}
             }
         }
     }
@@ -134,7 +147,7 @@ class NetworkDiscovery(private val context: Context) {
                 port = CodeFlowApp.TRANSFER_PORT
             )
 
-            if (device.id != deviceId && !isLocalAddress(remoteAddress)) {
+            if (device.id != deviceId) {
                 discoveredDevices[device.id] = device
                 _devices.value = discoveredDevices.values.toList()
             }

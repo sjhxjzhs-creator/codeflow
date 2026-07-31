@@ -36,6 +36,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -155,6 +156,9 @@ class DeviceListActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@DeviceListActivity)
             adapter = deviceAdapter
         }
+        // 空白处点击：刷新 / 停止（仅蓝牙·局域网页生效）
+        binding.rvDevices.setOnClickListener { handleBlankRefresh() }
+        binding.tvEmptyHint.setOnClickListener { handleBlankRefresh() }
         
         // 好友操作按钮
         binding.btnCreateGroup.setOnClickListener {
@@ -198,9 +202,8 @@ class DeviceListActivity : AppCompatActivity() {
         updateModeIcon(R.id.action_wifi, mode == Mode.WIFI, white, dimmed)
         updateModeIcon(R.id.action_friends, mode == Mode.FRIENDS, white, dimmed)
         updateModeIcon(R.id.action_search, mode == Mode.CHAT_ROOMS, white, dimmed)
-        
         isConnecting = false
-        
+
         // 更新 UI
         when (mode) {
             Mode.BLUETOOTH -> {
@@ -269,6 +272,9 @@ class DeviceListActivity : AppCompatActivity() {
 
     private fun observeState() {
         lifecycleScope.launch {
+            launch {
+                observeDiscoveryState()
+            }
             launch {
                 connectionManager.getBluetoothDevices().collectLatest { devices ->
                     discoveredDeviceIds.addAll(devices.map { it.id })
@@ -403,6 +409,47 @@ class DeviceListActivity : AppCompatActivity() {
             connectionManager.startNetworkServer()
         }
         binding.progressBar.visibility = View.VISIBLE
+    }
+
+    // 空白处点击：正在发现则停止，否则重新刷新（仅蓝牙/局域网页生效）
+    private fun handleBlankRefresh() {
+        if (currentMode != Mode.BLUETOOTH && currentMode != Mode.WIFI) return
+        val discovering = when (currentMode) {
+            Mode.BLUETOOTH -> connectionManager.getBluetoothDiscovery().isDiscovering.value
+            else -> connectionManager.getNetworkDiscovery().isDiscovering.value
+        }
+        if (discovering) {
+            when (currentMode) {
+                Mode.BLUETOOTH -> connectionManager.stopBluetoothDiscovery()
+                else -> connectionManager.stopNetworkDiscovery()
+            }
+            binding.progressBar.visibility = View.GONE
+        } else {
+            refreshDevices()
+        }
+    }
+
+    private suspend fun observeDiscoveryState() {
+        coroutineScope {
+            launch {
+                connectionManager.getBluetoothDiscovery().isDiscovering.collectLatest { _ ->
+                    if (currentMode == Mode.BLUETOOTH) syncDiscoveryUi()
+                }
+            }
+            launch {
+                connectionManager.getNetworkDiscovery().isDiscovering.collectLatest { _ ->
+                    if (currentMode == Mode.WIFI) syncDiscoveryUi()
+                }
+            }
+        }
+    }
+
+    private fun syncDiscoveryUi() {
+        val discovering = when (currentMode) {
+            Mode.BLUETOOTH -> connectionManager.getBluetoothDiscovery().isDiscovering.value
+            else -> connectionManager.getNetworkDiscovery().isDiscovering.value
+        }
+        binding.progressBar.visibility = if (discovering) View.VISIBLE else View.GONE
     }
 
     private fun initiateConnection(device: Device) {

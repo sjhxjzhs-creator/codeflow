@@ -9,15 +9,14 @@
     android:paddingTop="28dp"
     android:paddingBottom="16dp">
 
-    <ImageView
-        android:id="@+id/ivAvatar"
+    <TextView
         android:layout_width="72dp"
         android:layout_height="72dp"
         android:layout_gravity="center_horizontal"
         android:background="@drawable/ic_bt_avatar_bg"
-        android:contentDescription="@string/connection_request"
-        android:padding="18dp"
-        android:src="@drawable/ic_bluetooth_white" />
+        android:gravity="center"
+        android:text="😅"
+        android:textSize="38sp" />
 
     <TextView
         android:id="@+id/tvTitle"

@@ -1,6 +1,8 @@
 package com.codeflow.ui
 
 import android.bluetooth.BluetoothAdapter
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -87,13 +89,25 @@ class SettingsActivity : AppCompatActivity() {
             AppLog.clear()
             refreshLog()
         }
+        binding.btnCopyLog.setOnClickListener {
+            val log = AppLog.snapshot()
+            if (log.isEmpty()) {
+                Toast.makeText(this, "暂无日志可复制", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(
+                ClipData.newPlainText("Bchat 日志", log.joinToString("\n"))
+            )
+            Toast.makeText(this, "日志已复制", Toast.LENGTH_SHORT).show()
+        }
         refreshLog()
     }
 
     private fun toggleLog() {
         logExpanded = !logExpanded
         binding.logPanel.visibility = if (logExpanded) View.VISIBLE else View.GONE
-        binding.btnClearLog.visibility = if (logExpanded) View.VISIBLE else View.GONE
+        binding.logButtons.visibility = if (logExpanded) View.VISIBLE else View.GONE
         if (logExpanded) refreshLog()
     }
 
