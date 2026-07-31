@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_bluetooth"
+        android:title="蓝牙"
+        android:icon="@drawable/ic_bluetooth"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_wifi"
+        android:title="WiFi"
+        android:icon="@drawable/ic_wifi"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_friends"
+        android:title="好友"
+        android:icon="@drawable/ic_friends"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_search"
+        android:title="搜索"
+        android:icon="@drawable/ic_search"
+        app:showAsAction="ifRoom" />
+
     <item
         android:id="@+id/action_settings"
         android:title="设置"

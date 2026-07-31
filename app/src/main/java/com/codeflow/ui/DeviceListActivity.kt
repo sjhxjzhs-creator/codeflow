@@ -4,6 +4,8 @@ import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.Intent
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
@@ -76,7 +78,6 @@ class DeviceListActivity : AppCompatActivity() {
         
         setupDeviceInfo()
         setupUI()
-        setupChipListeners()
         observeState()
         requestPermissions()
         
@@ -101,6 +102,22 @@ class DeviceListActivity : AppCompatActivity() {
         binding.toolbar.inflateMenu(R.menu.toolbar_menu)
         binding.toolbar.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
+                R.id.action_bluetooth -> {
+                    setMode(Mode.BLUETOOTH)
+                    true
+                }
+                R.id.action_wifi -> {
+                    setMode(Mode.WIFI)
+                    true
+                }
+                R.id.action_friends -> {
+                    setMode(Mode.FRIENDS)
+                    true
+                }
+                R.id.action_search -> {
+                    setMode(Mode.CHAT_ROOMS)
+                    true
+                }
                 R.id.action_settings -> {
                     startActivity(Intent(this, SettingsActivity::class.java))
                     true
@@ -129,13 +146,16 @@ class DeviceListActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupChipListeners() {
-        binding.chipBluetooth.setOnClickListener { setMode(Mode.BLUETOOTH) }
-        binding.chipWifi.setOnClickListener { setMode(Mode.WIFI) }
-        binding.chipFriends.setOnClickListener { setMode(Mode.FRIENDS) }
-        binding.chipChatRooms.setOnClickListener { setMode(Mode.CHAT_ROOMS) }
+    private fun updateModeIcon(
+        menuItemId: Int,
+        isSelected: Boolean,
+        selectedColor: Int,
+        dimmedColor: Int
+    ) {
+        binding.toolbar.menu.findItem(menuItemId)?.icon?.mutate()?.colorFilter =
+            PorterDuffColorFilter(if (isSelected) selectedColor else dimmedColor, PorterDuff.Mode.SRC_IN)
     }
-    
+
     private fun loadSavedFriends() {
         val friendsJson = prefs.getString("saved_friends", null)
         if (friendsJson != null) {
@@ -152,11 +172,13 @@ class DeviceListActivity : AppCompatActivity() {
     private fun setMode(mode: Mode) {
         currentMode = mode
         
-        // 重置所有 chip 状态
-        binding.chipBluetooth.isChecked = (mode == Mode.BLUETOOTH)
-        binding.chipWifi.isChecked = (mode == Mode.WIFI)
-        binding.chipFriends.isChecked = (mode == Mode.FRIENDS)
-        binding.chipChatRooms.isChecked = (mode == Mode.CHAT_ROOMS)
+        // 高亮当前模式图标
+        val white = ContextCompat.getColor(this, android.R.color.white)
+        val dimmed = (white and 0xFFFFFF) or (0x80 shl 24)
+        updateModeIcon(R.id.action_bluetooth, mode == Mode.BLUETOOTH, white, dimmed)
+        updateModeIcon(R.id.action_wifi, mode == Mode.WIFI, white, dimmed)
+        updateModeIcon(R.id.action_friends, mode == Mode.FRIENDS, white, dimmed)
+        updateModeIcon(R.id.action_search, mode == Mode.CHAT_ROOMS, white, dimmed)
         
         isConnecting = false
         

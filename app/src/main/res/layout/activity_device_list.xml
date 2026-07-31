@@ -15,55 +15,6 @@
         app:title="@string/app_name"
         app:titleTextColor="@android:color/white" />
 
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:fillViewport="true">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:gravity="center_vertical">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipBluetooth"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:chipIcon="@drawable/ic_bluetooth"
-                app:chipIconVisible="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipWifi"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:chipIcon="@drawable/ic_wifi"
-                app:chipIconVisible="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipFriends"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:chipIcon="@drawable/ic_friends"
-                app:chipIconVisible="true" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipChatRooms"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:chipIcon="@drawable/ic_search"
-                app:chipIconVisible="true" />
-
-        </LinearLayout>
-
-    </HorizontalScrollView>
-
     <TextView
         android:id="@+id/tvEmptyHint"
         android:layout_width="match_parent"
